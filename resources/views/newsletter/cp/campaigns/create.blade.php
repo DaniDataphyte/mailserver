@@ -168,7 +168,7 @@
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="action" value="schedule"
                                x-model="action" class="radio">
-                        <span class="text-sm">Schedule</span>
+                        <span class="text-sm">Schedule <span class="text-grey-50 font-normal">(pick a future date &darr;)</span></span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="action" value="send"

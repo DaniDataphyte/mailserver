@@ -46,7 +46,7 @@
         <td style="padding:12px 40px 28px;text-align:center;">
             <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
                        font-size:13px;color:#888888;">
-                {{ $sentDate }}
+                {{ $sentDate ?? now()->format('F j, Y') }}
                 @if(!empty($author))
                 &nbsp;&middot;&nbsp; By {{ $author }}
                 @endif

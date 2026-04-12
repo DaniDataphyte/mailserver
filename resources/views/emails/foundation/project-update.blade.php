@@ -48,7 +48,7 @@
             @if(!empty($author))
             <p style="margin:8px 0 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
                        font-size:13px;color:#888888;">
-                Reported by {{ $author }} &nbsp;&middot;&nbsp; {{ $sentDate }}
+                Reported by {{ $author }} &nbsp;&middot;&nbsp; {{ $sentDate ?? now()->format('F j, Y') }}
             </p>
             @endif
         </td>

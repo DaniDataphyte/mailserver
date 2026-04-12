@@ -56,7 +56,7 @@
                 @if(!empty($author))
                     Analysis by <strong style="color:#555555;">{{ $author }}</strong> &nbsp;&middot;&nbsp;
                 @endif
-                {{ $sentDate }}
+                {{ $sentDate ?? now()->format('F j, Y') }}
             </p>
         </td>
     </tr>

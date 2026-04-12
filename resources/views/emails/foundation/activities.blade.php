@@ -35,7 +35,7 @@
                     </td>
                     <td style="text-align:right;">
                         <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                                   font-size:12px;color:#555555;">{{ $sentDate }}</p>
+                                   font-size:12px;color:#555555;">{{ $sentDate ?? now()->format('F j, Y') }}</p>
                     </td>
                 </tr>
             </table>

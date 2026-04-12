@@ -47,7 +47,7 @@
             <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
                        font-size:13px;color:#888888;">
                 By <strong style="color:#555555;">{{ $author }}</strong>
-                &nbsp;&middot;&nbsp; {{ $sentDate }}
+                &nbsp;&middot;&nbsp; {{ $sentDate ?? now()->format('F j, Y') }}
             </p>
         </td>
     </tr>

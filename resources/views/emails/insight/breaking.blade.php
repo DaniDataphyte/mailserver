@@ -38,7 +38,7 @@
             <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
                        font-size:12px;font-weight:700;color:#c0392b;letter-spacing:1px;
                        text-transform:uppercase;">
-                {{ $sentDate }}
+                {{ $sentDate ?? now()->format('F j, Y') }}
                 @if(!empty($author))&nbsp;&middot;&nbsp; {{ $author }}@endif
             </p>
         </td>

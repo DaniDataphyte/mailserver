@@ -33,7 +33,7 @@
                 {{ $subject }}
             </h1>
             <p style="margin:10px 0 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                       font-size:13px;color:#888888;">{{ $sentDate }}</p>
+                       font-size:13px;color:#888888;">{{ $sentDate ?? now()->format('F j, Y') }}</p>
         </td>
     </tr>
 
