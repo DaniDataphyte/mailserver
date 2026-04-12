@@ -6,3 +6,5 @@ preferences:
   collections:
     foundation_newsletters:
       view: list
+    insight_newsletters:
+      view: list

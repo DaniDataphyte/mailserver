@@ -103,13 +103,15 @@ return [
         ],
 
         // Mailtrap sandbox — safe for dev/testing (all mail caught, never delivered)
+        // Credentials: mailtrap.io → Inboxes → SMTP Settings
+        // Set MAIL_USERNAME + MAIL_PASSWORD + MAIL_ENCRYPTION in .env
         'mailtrap' => [
             'transport' => 'smtp',
             'host'      => env('MAILTRAP_HOST', 'sandbox.smtp.mailtrap.io'),
-            'port'      => env('MAILTRAP_PORT', 2525),
-            'username'  => env('MAILTRAP_USERNAME'),
-            'password'  => env('MAILTRAP_PASSWORD'),
-            'encryption'=> null,
+            'port'      => env('MAILTRAP_PORT', env('MAIL_PORT', 2525)),
+            'username'  => env('MAILTRAP_USERNAME', env('MAIL_USERNAME')),
+            'password'  => env('MAILTRAP_PASSWORD', env('MAIL_PASSWORD')),
+            'encryption'=> env('MAIL_ENCRYPTION'),
             'timeout'   => 10,
         ],
 

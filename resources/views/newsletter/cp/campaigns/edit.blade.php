@@ -40,7 +40,9 @@
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-grey-80 mb-1">Collection <span class="text-red">*</span></label>
-                    <select name="collection" x-model="collection" class="input-text w-full">
+                    <select id="collection-select" name="collection" x-model="collection"
+                            class="input-text w-full"
+                            onchange="onCollectionChange(this.value)">
                         @foreach($collections as $value => $label)
                             <option value="{{ $value }}"
                                 {{ old('collection', $campaign->collection) === $value ? 'selected' : '' }}>
@@ -52,22 +54,16 @@
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-grey-80 mb-1">Content Entry</label>
-                    <select name="entry_id" x-model="entryId"
-                            @change="fillFromEntry()"
-                            class="input-text w-full">
+                    <select id="entry-select" name="entry_id"
+                            class="input-text w-full"
+                            onchange="onEntryChange(this.value)">
                         <option value="">— No entry linked —</option>
-                        <template x-for="entry in filteredEntries" :key="entry.id">
-                            <option :value="entry.id"
-                                    :selected="entry.id === entryId"
-                                    x-text="`${entry.date ? entry.date + ' — ' : ''}${entry.title}`">
-                            </option>
-                        </template>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-grey-80 mb-1">Subject Line <span class="text-red">*</span></label>
-                    <input type="text" name="subject" x-model="subject" class="input-text w-full">
+                    <input type="text" id="subject-input" name="subject" x-model="subject" class="input-text w-full">
                 </div>
             </div>
 
@@ -186,26 +182,59 @@
 </form>
 
 <script>
+const ALL_ENTRIES    = @json($entries);
+const OLD_ENTRY_ID   = '{{ old('entry_id', $campaign->entry_id ?? '') }}';
+const OLD_COLLECTION = '{{ old('collection', $campaign->collection) }}';
+
+function onCollectionChange(collection) {
+    populateEntries(collection, '');
+}
+
+function onEntryChange(entryId) {
+    if (!entryId) return;
+    const collection = document.getElementById('collection-select').value;
+    const entries    = ALL_ENTRIES[collection] || [];
+    const entry      = entries.find(e => e.id === entryId);
+    if (entry && entry.subject) {
+        const subjectInput = document.getElementById('subject-input');
+        if (subjectInput && !subjectInput.value) {
+            subjectInput.value = entry.subject;
+        }
+    }
+}
+
+function populateEntries(collection, selectedId) {
+    const select  = document.getElementById('entry-select');
+    const entries = ALL_ENTRIES[collection] || [];
+    select.innerHTML = '<option value="">— No entry linked —</option>';
+    entries.forEach(function(entry) {
+        const opt   = document.createElement('option');
+        opt.value   = entry.id;
+        opt.text    = (entry.date ? entry.date + ' — ' : '') + entry.title;
+        opt.selected = entry.id === selectedId;
+        select.appendChild(opt);
+    });
+    if (entries.length === 0) {
+        const opt    = document.createElement('option');
+        opt.disabled = true;
+        opt.text     = '(No published entries for this collection)';
+        select.appendChild(opt);
+    }
+}
+
+// Populate immediately on page load with the campaign's current values
+document.addEventListener('DOMContentLoaded', function () {
+    if (OLD_COLLECTION) {
+        populateEntries(OLD_COLLECTION, OLD_ENTRY_ID);
+    }
+});
+
 function campaignForm() {
     return {
-        collection: '{{ old('collection', $campaign->collection) }}',
-        entryId: '{{ old('entry_id', $campaign->entry_id ?? '') }}',
+        collection: OLD_COLLECTION,
         subject: '{{ old('subject', addslashes($campaign->subject ?? '')) }}',
         sendToAll: {{ $sendToAll ? 'true' : 'false' }},
         action: '{{ old('action', 'draft') }}',
-        entries: @json($entries),
-
-        init() {},
-
-        get filteredEntries() {
-            return this.entries[this.collection] || [];
-        },
-
-        fillFromEntry() {
-            if (!this.entryId) return;
-            const entry = this.filteredEntries.find(e => e.id === this.entryId);
-            if (entry && entry.subject) this.subject = entry.subject;
-        },
 
         groupMatchesCollection(groupSlug) {
             if (!this.collection) return true;
