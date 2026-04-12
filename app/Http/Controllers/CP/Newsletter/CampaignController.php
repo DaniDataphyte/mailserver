@@ -293,14 +293,13 @@ class CampaignController extends Controller
 
         $collection      = $campaign->collection ?? '';
         $collectionKey   = str_replace('_newsletters', '', $collection);
-        $collectionLogo  = $this->campaignLogoUrl($settings["{$collectionKey}_logo"] ?? null);
+        $collectionLogo  = $this->campaignAssetUrl($settings["{$collectionKey}_logo"] ?? null);
         $headerColor     = $settings["{$collectionKey}_brand_color"]
                             ?? config("newsletter.collections.{$collection}.brand_color", '#1a1a2e');
 
         $template = app(TemplateResolver::class)->resolve($entry, $collection);
 
-        $heroAsset  = $entry?->get('hero_image');
-        $heroUrl    = $heroAsset ? asset('storage/' . $heroAsset) : null;
+        $heroUrl    = $this->campaignAssetUrl($entry?->get('hero_image'));
 
         $rawContent = $entry?->get('content') ?? '<p><em>(No content yet — link an entry to this campaign.)</em></p>';
         $content    = UtmInjector::inject($rawContent, [
@@ -491,11 +490,78 @@ class CampaignController extends Controller
     }
 
     /** Convert a Statamic asset path/object to a public URL (mirrors Mailable). */
-    private function campaignLogoUrl(mixed $value): ?string
+    private function campaignAssetUrl(mixed $value): ?string
     {
-        if (! $value) return null;
-        if (is_string($value)) return asset('storage/' . ltrim($value, '/'));
-        if (is_object($value) && method_exists($value, 'url')) return $value->url();
+        if (! $value) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return $this->campaignAssetUrl(reset($value) ?: null);
+        }
+
+        if (is_object($value) && method_exists($value, 'value') && ! method_exists($value, 'url')) {
+            return $this->campaignAssetUrl($value->value());
+        }
+
+        if (is_object($value) && method_exists($value, 'url')) {
+            return $this->normalizeAssetUrl($value->url());
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            if ($value === '') {
+                return null;
+            }
+
+            if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '//')) {
+                return $this->normalizeAssetUrl($value);
+            }
+
+            if (str_starts_with($value, '/')) {
+                return $this->normalizeAssetUrl(url($value, [], $this->shouldUseHttpsForAssets()));
+            }
+
+            return $this->normalizeAssetUrl(asset('storage/' . ltrim($value, '/'), $this->shouldUseHttpsForAssets()));
+        }
+
         return null;
+    }
+
+    private function normalizeAssetUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        if (str_starts_with($url, '//')) {
+            return ($this->shouldUseHttpsForAssets() ? 'https:' : 'http:') . $url;
+        }
+
+        if ($this->shouldUseHttpsForAssets() && str_starts_with($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+            return url($url, [], $this->shouldUseHttpsForAssets());
+        }
+
+        return $url;
+    }
+
+    private function shouldUseHttpsForAssets(): bool
+    {
+        if (app()->bound('request')) {
+            try {
+                return request()->isSecure();
+            } catch (\Throwable) {
+                // Fall through to config-based detection when there is no active request.
+            }
+        }
+
+        $assetRoot = config('app.asset_url') ?: config('app.url');
+
+        return parse_url((string) $assetRoot, PHP_URL_SCHEME) === 'https';
     }
 }

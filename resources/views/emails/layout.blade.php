@@ -59,7 +59,7 @@
                                 <img src="{{ $collectionLogo }}"
                                      alt="{{ $fromName ?? config('app.name') }}"
                                      height="36"
-                                     style="height:36px;max-width:180px;display:inline-block;">
+                                     style="height:36px;width:auto;max-width:180px;display:block;margin:0 auto;">
                             @else
                                 <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
                                              font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">

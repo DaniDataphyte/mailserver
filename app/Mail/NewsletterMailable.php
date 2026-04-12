@@ -58,13 +58,12 @@ class NewsletterMailable extends Mailable
         // Collection-aware logo and brand colour
         $collection      = $this->campaign->collection ?? '';
         $collectionKey   = str_replace('_newsletters', '', $collection); // insight | foundation
-        $collectionLogo  = $this->resolveLogoUrl($settings["{$collectionKey}_logo"] ?? null);
+        $collectionLogo  = $this->resolveAssetUrl($settings["{$collectionKey}_logo"] ?? null);
         $headerColor     = $settings["{$collectionKey}_brand_color"]
                             ?? config("newsletter.collections.{$collection}.brand_color", '#1a1a2e');
 
         // Hero image
-        $heroAsset = $entry?->get('hero_image');
-        $heroUrl   = $heroAsset ? asset('storage/' . $heroAsset) : null;
+        $heroUrl = $this->resolveAssetUrl($entry?->get('hero_image'));
 
         // Inject UTM into bard content, then replace subscriber merge tags
         $rawContent = $entry?->get('content') ?? '';
@@ -88,6 +87,7 @@ class NewsletterMailable extends Mailable
                 'sentDate'           => $this->campaign->sent_at?->format('F j, Y') ?? now()->format('F j, Y'),
                 'collectionLogo'     => $collectionLogo,
                 'headerColor'        => $headerColor,
+                'newsletterSettings' => $settings,
                 'unsubscribeUrl'     => $this->buildSignedUrl('newsletter.unsubscribe.show'),
                 'preferencesUrl'     => $this->buildSignedUrl('newsletter.preferences.show'),
                 // Subscriber personalisation variables (use in templates directly)
@@ -147,23 +147,79 @@ class NewsletterMailable extends Mailable
      * Convert a Statamic asset value (path string or Asset object) to a
      * fully-qualified public URL.
      */
-    private function resolveLogoUrl(mixed $value): ?string
+    private function resolveAssetUrl(mixed $value): ?string
     {
         if (! $value) {
             return null;
         }
 
-        // Statamic assets field returns a path string when save_html is used
-        if (is_string($value)) {
-            return asset('storage/' . ltrim($value, '/'));
+        if (is_array($value)) {
+            return $this->resolveAssetUrl(reset($value) ?: null);
         }
 
-        // Asset object (Statamic\Assets\Asset)
+        if (is_object($value) && method_exists($value, 'value') && ! method_exists($value, 'url')) {
+            return $this->resolveAssetUrl($value->value());
+        }
+
         if (is_object($value) && method_exists($value, 'url')) {
-            return $value->url();
+            return $this->normalizeAssetUrl($value->url());
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            if ($value === '') {
+                return null;
+            }
+
+            if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '//')) {
+                return $this->normalizeAssetUrl($value);
+            }
+
+            if (str_starts_with($value, '/')) {
+                return $this->normalizeAssetUrl(url($value, [], $this->shouldUseHttpsForAssets()));
+            }
+
+            return $this->normalizeAssetUrl(asset('storage/' . ltrim($value, '/'), $this->shouldUseHttpsForAssets()));
         }
 
         return null;
+    }
+
+    private function normalizeAssetUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        if (str_starts_with($url, '//')) {
+            return ($this->shouldUseHttpsForAssets() ? 'https:' : 'http:') . $url;
+        }
+
+        if ($this->shouldUseHttpsForAssets() && str_starts_with($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+            return url($url, [], $this->shouldUseHttpsForAssets());
+        }
+
+        return $url;
+    }
+
+    private function shouldUseHttpsForAssets(): bool
+    {
+        if (app()->bound('request')) {
+            try {
+                return request()->isSecure();
+            } catch (\Throwable) {
+                // Fall through to config-based detection when there is no active request.
+            }
+        }
+
+        $assetRoot = config('app.asset_url') ?: config('app.url');
+
+        return parse_url((string) $assetRoot, PHP_URL_SCHEME) === 'https';
     }
 
     /**
