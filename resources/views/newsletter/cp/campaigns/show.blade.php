@@ -50,7 +50,7 @@
                  @click.outside="open = false"
                  class="absolute right-0 top-full mt-1 w-72 bg-white border border-grey-20 rounded shadow-lg z-50 p-4">
                 <p class="text-sm font-medium mb-1">Send test email to:</p>
-                <p class="text-xs text-grey-50 mb-2">Merge tags like <code>{{first_name}}</code> will show real values from the matched subscriber, or nothing if no match.</p>
+                <p class="text-xs text-grey-50 mb-2">Merge tags like <code>@{{first_name}}</code>, <code>@{{last_name}}</code>, <code>@{{full_name}}</code>, <code>@{{email}}</code> — replaced with subscriber data, blank if not set.</p>
                 <form method="POST"
                       action="{{ cp_route('newsletter.campaigns.test-send', $campaign) }}">
                     @csrf

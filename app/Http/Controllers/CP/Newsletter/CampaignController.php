@@ -445,10 +445,11 @@ class CampaignController extends Controller
 
             foreach ($collectionEntries as $entry) {
                 $entries[$collection][] = [
-                    'id'      => $entry->id(),
-                    'title'   => $entry->get('title') ?: $entry->get('subject') ?: '(Untitled)',
-                    'subject' => $entry->get('subject') ?? '',
-                    'date'    => optional($entry->date())->format('M j, Y') ?? '',
+                    'id'        => $entry->id(),
+                    'title'     => $entry->get('title') ?: $entry->get('subject') ?: '(Untitled)',
+                    'subject'   => $entry->get('subject') ?? '',
+                    'date'      => optional($entry->date())->format('M j, Y') ?? '',
+                    'blueprint' => $entry->blueprint()?->title() ?? $entry->blueprint()?->handle() ?? '',
                 ];
             }
         }

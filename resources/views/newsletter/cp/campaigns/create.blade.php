@@ -234,7 +234,8 @@ function populateEntries(collection, selectedId) {
     entries.forEach(function(entry) {
         const opt   = document.createElement('option');
         opt.value   = entry.id;
-        opt.text    = (entry.date ? entry.date + ' — ' : '') + entry.title;
+        const tag   = entry.blueprint ? '[' + entry.blueprint + '] ' : '';
+        opt.text    = tag + (entry.date ? entry.date + ' — ' : '') + entry.title;
         opt.selected = entry.id === selectedId;
         select.appendChild(opt);
     });
