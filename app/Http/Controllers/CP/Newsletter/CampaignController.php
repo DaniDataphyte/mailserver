@@ -85,9 +85,9 @@ class CampaignController extends Controller
             'collection'   => $data['collection'],
             'entry_id'     => $data['entry_id'] ?? null,
             'subject'      => $data['subject'],
-            'from_name'    => $data['from_name']  ?? null,
-            'from_email'   => $data['from_email'] ?? null,
-            'reply_to'     => $data['reply_to']   ?? null,
+            'from_name'    => $this->blankToNull($data['from_name']  ?? null),
+            'from_email'   => $this->blankToNull($data['from_email'] ?? null),
+            'reply_to'     => $this->blankToNull($data['reply_to']   ?? null),
             'status'       => $status,
             'scheduled_at' => $data['action'] === 'schedule' ? $data['scheduled_at'] : null,
             'sent_at'      => $data['action'] === 'send' ? now() : null,
@@ -193,9 +193,9 @@ class CampaignController extends Controller
             'collection'   => $data['collection'],
             'entry_id'     => $data['entry_id'] ?? null,
             'subject'      => $data['subject'],
-            'from_name'    => $data['from_name']  ?? null,
-            'from_email'   => $data['from_email'] ?? null,
-            'reply_to'     => $data['reply_to']   ?? null,
+            'from_name'    => $this->blankToNull($data['from_name']  ?? null),
+            'from_email'   => $this->blankToNull($data['from_email'] ?? null),
+            'reply_to'     => $this->blankToNull($data['reply_to']   ?? null),
             'status'       => $status,
             'scheduled_at' => $data['action'] === 'schedule' ? $data['scheduled_at'] : null,
             'sent_at'      => $data['action'] === 'send' ? now() : null,
@@ -463,6 +463,12 @@ class CampaignController extends Controller
         }
 
         return $entries;
+    }
+
+    /** Convert empty string to null so optional sender fields don't trip NOT NULL (now nullable). */
+    private function blankToNull(?string $value): ?string
+    {
+        return ($value === null || trim($value) === '') ? null : $value;
     }
 
     /** Fetch newsletter_settings GlobalSet, cached 1 hour (mirrors Mailable). */
