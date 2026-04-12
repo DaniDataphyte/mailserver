@@ -102,6 +102,17 @@ return [
             'key' => env('ELASTIC_EMAIL_API_KEY'),
         ],
 
+        // Mailtrap sandbox — safe for dev/testing (all mail caught, never delivered)
+        'mailtrap' => [
+            'transport' => 'smtp',
+            'host'      => env('MAILTRAP_HOST', 'sandbox.smtp.mailtrap.io'),
+            'port'      => env('MAILTRAP_PORT', 2525),
+            'username'  => env('MAILTRAP_USERNAME'),
+            'password'  => env('MAILTRAP_PASSWORD'),
+            'encryption'=> null,
+            'timeout'   => 10,
+        ],
+
     ],
 
     /*
