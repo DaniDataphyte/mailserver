@@ -315,7 +315,7 @@
                     'groups'      => \App\Models\SubscriberGroup::count(),
                 ];
             @endphp
-            <div class="stats">
+            {{-- <div class="stats">
                 <div>
                     <div class="stat-val">{{ number_format($stats['subscribers']) }}</div>
                     <div class="stat-lbl">Active subscribers</div>
@@ -328,7 +328,7 @@
                     <div class="stat-val">{{ number_format($stats['groups']) }}</div>
                     <div class="stat-lbl">Subscriber groups</div>
                 </div>
-            </div>
+            </div> --}}
 
         </div>
     </section>

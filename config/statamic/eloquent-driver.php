@@ -42,7 +42,10 @@ return [
 
     'entries' => [
         'driver' => 'eloquent',
-        'model' => \Statamic\Eloquent\Entries\EntryModel::class,
+        // Custom model adds HasUuids so MySQL entries.id is auto-generated on insert.
+        // Without this, Entry::make() has no id() and MySQL throws
+        // "Field 'id' doesn't have a default value" on first save.
+        'model' => \App\Models\EntryModel::class,
         'entry' => \Statamic\Eloquent\Entries\Entry::class,
         'map_data_to_columns' => false,
     ],
