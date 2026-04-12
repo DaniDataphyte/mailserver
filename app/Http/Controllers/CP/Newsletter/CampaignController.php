@@ -98,13 +98,11 @@ class CampaignController extends Controller
 
         if ($data['action'] === 'send') {
             DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
-            return redirect()
-                ->route('newsletter.campaigns.show', $campaign)
+            return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('success', 'Campaign is being dispatched.');
         }
 
-        return redirect()
-            ->route('newsletter.campaigns.show', $campaign)
+        return redirect(cp_route('newsletter.campaigns.show', $campaign))
             ->with('success', $data['action'] === 'schedule'
                 ? 'Campaign scheduled for ' . $campaign->scheduled_at->format('M j, Y g:i A') . '.'
                 : 'Campaign saved as draft.'
@@ -205,13 +203,11 @@ class CampaignController extends Controller
 
         if ($data['action'] === 'send') {
             DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
-            return redirect()
-                ->route('newsletter.campaigns.show', $campaign)
+            return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('success', 'Campaign is being dispatched.');
         }
 
-        return redirect()
-            ->route('newsletter.campaigns.show', $campaign)
+        return redirect(cp_route('newsletter.campaigns.show', $campaign))
             ->with('success', 'Campaign updated.');
     }
 
@@ -229,8 +225,7 @@ class CampaignController extends Controller
 
         $campaign->delete();
 
-        return redirect()
-            ->route('newsletter.campaigns.index')
+        return redirect(cp_route('newsletter.campaigns.index'))
             ->with('success', 'Campaign deleted.');
     }
 
@@ -244,8 +239,7 @@ class CampaignController extends Controller
 
         $campaign->update(['status' => 'draft', 'scheduled_at' => null]);
 
-        return redirect()
-            ->route('newsletter.campaigns.show', $campaign)
+        return redirect(cp_route('newsletter.campaigns.show', $campaign))
             ->with('success', 'Campaign moved back to draft.');
     }
 
@@ -265,8 +259,7 @@ class CampaignController extends Controller
 
         DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
 
-        return redirect()
-            ->route('newsletter.campaigns.show', $campaign)
+        return redirect(cp_route('newsletter.campaigns.show', $campaign))
             ->with('success', 'Campaign is being dispatched to the queue.');
     }
 
@@ -352,13 +345,11 @@ class CampaignController extends Controller
                 new NewsletterMailable($campaign, $subscriber, 'test-' . time())
             );
 
-            return redirect()
-                ->route('newsletter.campaigns.show', $campaign)
+            return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('success', "Test email sent to {$email}.");
 
         } catch (\Throwable $e) {
-            return redirect()
-                ->route('newsletter.campaigns.show', $campaign)
+            return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('error', "Test send failed: {$e->getMessage()}");
         }
     }

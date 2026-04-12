@@ -111,8 +111,7 @@ class GdprController extends Controller
             $subscriber->allSubGroups()->detach();
         });
 
-        return redirect()
-            ->route('newsletter.subscribers.index')
+        return redirect(cp_route('newsletter.subscribers.index'))
             ->with('success', "Subscriber #{$subscriber->id} data has been erased.");
     }
 }
