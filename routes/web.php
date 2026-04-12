@@ -16,7 +16,23 @@ Route::get('/', function () {
         return redirect('/cp');
     }
 
-    return view('landing.index');
+    // Fetch site logo from the newsletter_settings GlobalSet (editor-controlled)
+    $siteLogo = null;
+    try {
+        $gs = \Statamic\Facades\GlobalSet::findByHandle('newsletter_settings');
+        if ($gs) {
+            $raw = $gs->inDefaultSite()?->data()?->get('site_logo');
+            if ($raw) {
+                $siteLogo = is_string($raw)
+                    ? asset('storage/' . ltrim($raw, '/'))
+                    : (method_exists($raw, 'url') ? $raw->url() : null);
+            }
+        }
+    } catch (\Throwable) {
+        // GlobalSet not yet scaffolded — silent fallback
+    }
+
+    return view('landing.index', compact('siteLogo'));
 })->name('landing');
 
 /*

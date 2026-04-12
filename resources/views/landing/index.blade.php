@@ -245,17 +245,25 @@
     <section class="hero">
         <div class="hero-content">
 
-            {{-- Wordmark --}}
+            {{-- Wordmark / Site Logo --}}
             <div class="wordmark">
-                <div class="wordmark-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="wordmark-text">Dataphyte</div>
-                    <div class="wordmark-sub">Mailserver</div>
-                </div>
+                @if(!empty($siteLogo))
+                    {{-- Site logo uploaded via CP → Globals → Newsletter Settings --}}
+                    <img src="{{ $siteLogo }}"
+                         alt="{{ config('app.name') }}"
+                         style="height:40px;max-width:200px;object-fit:contain;display:block;">
+                @else
+                    {{-- Fallback icon + text wordmark --}}
+                    <div class="wordmark-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="wordmark-text">{{ config('app.name') }}</div>
+                        <div class="wordmark-sub">Mailserver</div>
+                    </div>
+                @endif
             </div>
 
             <h1>Newsletter&nbsp;delivery,<br>owned end&#8209;to&#8209;end.</h1>

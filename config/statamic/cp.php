@@ -103,7 +103,30 @@ return [
     |
     */
 
-    'custom_cms_name' => env('STATAMIC_CUSTOM_CMS_NAME', 'Statamic'),
+    /*
+    |--------------------------------------------------------------------------
+    | White Labelling — Dataphyte Mailserver
+    |--------------------------------------------------------------------------
+    |
+    | STATAMIC_CUSTOM_LOGO_URL      — Set to a public URL for your light-mode logo.
+    |                                  e.g. /storage/logos/dataphyte-logo-light.png
+    |                                  Upload via CP → Globals → Newsletter Settings,
+    |                                  then copy the public URL here.
+    |
+    | STATAMIC_CUSTOM_DARK_LOGO_URL — Same logo optimised for dark backgrounds.
+    |                                  If omitted, the light logo is used on dark bg too.
+    |
+    | STATAMIC_CUSTOM_CSS_URL       — Optional extra CSS injected into every CP page.
+    |                                  Use /storage/cp-custom.css (public disk) or any URL.
+    |
+    | NOTE: These are static paths from .env, not dynamic GlobalSet queries.
+    | The GlobalSet site_logo is used on the landing page only (pre-login).
+    | After uploading a logo, paste its /storage/ URL into .env and run:
+    |   php artisan config:clear
+    |
+    */
+
+    'custom_cms_name' => env('STATAMIC_CUSTOM_CMS_NAME', 'Dataphyte Mailserver'),
 
     'custom_logo_url' => env('STATAMIC_CUSTOM_LOGO_URL', null),
 
