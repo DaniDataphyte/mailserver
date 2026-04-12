@@ -66,7 +66,7 @@ class NewsletterMailable extends Mailable
         $heroAsset = $entry?->get('hero_image');
         $heroUrl   = $heroAsset ? asset('storage/' . $heroAsset) : null;
 
-        // Inject UTM into bard content
+        // Inject UTM into bard content, then replace subscriber merge tags
         $rawContent = $entry?->get('content') ?? '';
         $utmParams  = [
             'utm_source'   => 'newsletter',
@@ -74,21 +74,27 @@ class NewsletterMailable extends Mailable
             'utm_campaign' => 'campaign-' . $this->campaign->id,
         ];
         $content = UtmInjector::inject($rawContent, $utmParams);
+        $content = $this->applyMergeTags($content);
 
         return new Content(
             view: $template,
             with: [
-                'subject'        => $this->envelope()->subject,
-                'preheader'      => $entry?->get('preheader') ?? '',
-                'heroImageUrl'   => $heroUrl,
-                'content'        => $content,
-                'author'         => $entry?->get('author') ?? $sender['from_name'],
-                'fromName'       => $sender['from_name'],
-                'sentDate'       => $this->campaign->sent_at?->format('F j, Y') ?? now()->format('F j, Y'),
-                'collectionLogo' => $collectionLogo,
-                'headerColor'    => $headerColor,
-                'unsubscribeUrl' => $this->buildSignedUrl('newsletter.unsubscribe.show'),
-                'preferencesUrl' => $this->buildSignedUrl('newsletter.preferences.show'),
+                'subject'            => $this->envelope()->subject,
+                'preheader'          => $entry?->get('preheader') ?? '',
+                'heroImageUrl'       => $heroUrl,
+                'content'            => $content,
+                'author'             => $entry?->get('author') ?? $sender['from_name'],
+                'fromName'           => $sender['from_name'],
+                'sentDate'           => $this->campaign->sent_at?->format('F j, Y') ?? now()->format('F j, Y'),
+                'collectionLogo'     => $collectionLogo,
+                'headerColor'        => $headerColor,
+                'unsubscribeUrl'     => $this->buildSignedUrl('newsletter.unsubscribe.show'),
+                'preferencesUrl'     => $this->buildSignedUrl('newsletter.preferences.show'),
+                // Subscriber personalisation variables (use in templates directly)
+                'subscriberFirstName' => $this->subscriber->first_name ?? '',
+                'subscriberLastName'  => $this->subscriber->last_name  ?? '',
+                'subscriberFullName'  => $this->subscriber->full_name  ?? $this->subscriber->email,
+                'subscriberEmail'     => $this->subscriber->email      ?? '',
             ],
         );
     }
@@ -158,6 +164,25 @@ class NewsletterMailable extends Mailable
         }
 
         return null;
+    }
+
+    /**
+     * Replace {{merge_tag}} placeholders in the body content with real
+     * subscriber data.  Editors type these directly in the Bard field.
+     *
+     * Supported tags:
+     *   {{first_name}}  {{last_name}}  {{full_name}}  {{email}}
+     */
+    private function applyMergeTags(string $content): string
+    {
+        $map = [
+            '{{first_name}}' => $this->subscriber->first_name ?? '',
+            '{{last_name}}'  => $this->subscriber->last_name  ?? '',
+            '{{full_name}}'  => $this->subscriber->full_name  ?? $this->subscriber->email,
+            '{{email}}'      => $this->subscriber->email      ?? '',
+        ];
+
+        return str_replace(array_keys($map), array_values($map), $content);
     }
 
     private function buildSignedUrl(string $routeName): string

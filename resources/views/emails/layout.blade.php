@@ -104,10 +104,10 @@
                                         </p>
 
                                         <p style="margin:0 0 8px;">
-                                            <a href="{{ $preferencesUrl }}"
+                                            <a href="{{ $preferencesUrl ?? '#' }}"
                                                style="color:#555555;text-decoration:underline;">Manage preferences</a>
                                             &nbsp;&middot;&nbsp;
-                                            <a href="{{ $unsubscribeUrl }}"
+                                            <a href="{{ $unsubscribeUrl ?? '#' }}"
                                                style="color:#555555;text-decoration:underline;">Unsubscribe</a>
                                         </p>
 

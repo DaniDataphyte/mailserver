@@ -124,6 +124,7 @@ class NewsletterServiceProvider extends ServiceProvider
                     \Route::post('/{campaign}/send',      [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'send'])->name('send');
                     \Route::post('/{campaign}/cancel',    [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'cancel'])->name('cancel');
                     \Route::post('/{campaign}/test-send', [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'testSend'])->name('test-send');
+                    \Route::get('/{campaign}/preview',    [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'preview'])->name('preview');
                 });
 
                 // GDPR

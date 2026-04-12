@@ -9,10 +9,13 @@ use App\Models\Campaign;
 use App\Models\CampaignAudience;
 use App\Models\SubscriberGroup;
 use App\Models\SubscriberSubGroup;
+use App\Services\Newsletter\TemplateResolver;
+use App\Services\Newsletter\UtmInjector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Statamic\Facades\Entry;
+use Statamic\Facades\GlobalSet;
 
 class CampaignController extends Controller
 {
@@ -268,6 +271,69 @@ class CampaignController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /* Browser Preview                                                     */
+    /* ------------------------------------------------------------------ */
+
+    public function preview(Campaign $campaign)
+    {
+        $entry    = $campaign->entry_id ? Entry::find($campaign->entry_id) : null;
+        $settings = $this->campaignNewsletterSettings();
+        $sender   = $campaign->sender();
+
+        $collection      = $campaign->collection ?? '';
+        $collectionKey   = str_replace('_newsletters', '', $collection);
+        $collectionLogo  = $this->campaignLogoUrl($settings["{$collectionKey}_logo"] ?? null);
+        $headerColor     = $settings["{$collectionKey}_brand_color"]
+                            ?? config("newsletter.collections.{$collection}.brand_color", '#1a1a2e');
+
+        $template = app(TemplateResolver::class)->resolve($entry, $collection);
+
+        $heroAsset  = $entry?->get('hero_image');
+        $heroUrl    = $heroAsset ? asset('storage/' . $heroAsset) : null;
+
+        $rawContent = $entry?->get('content') ?? '<p><em>(No content yet — link an entry to this campaign.)</em></p>';
+        $content    = UtmInjector::inject($rawContent, [
+            'utm_source' => 'newsletter', 'utm_medium' => 'email', 'utm_campaign' => 'preview',
+        ]);
+
+        // Replace merge tags with visible placeholders for the preview
+        $content = str_replace(
+            ['{{first_name}}', '{{last_name}}', '{{full_name}}', '{{email}}'],
+            ['[First Name]',   '[Last Name]',   '[Full Name]',   '[email@example.com]'],
+            $content
+        );
+
+        $html = view($template, [
+            'subject'             => $campaign->subject ?? '(No subject)',
+            'preheader'           => $entry?->get('preheader') ?? '',
+            'heroImageUrl'        => $heroUrl,
+            'content'             => $content,
+            'author'              => $entry?->get('author') ?? $sender['from_name'],
+            'fromName'            => $sender['from_name'],
+            'sentDate'            => now()->format('F j, Y'),
+            'collectionLogo'      => $collectionLogo,
+            'headerColor'         => $headerColor,
+            'unsubscribeUrl'      => '#',
+            'preferencesUrl'      => '#',
+            'subscriberFirstName' => '[First Name]',
+            'subscriberLastName'  => '[Last Name]',
+            'subscriberFullName'  => '[Full Name]',
+            'subscriberEmail'     => '[email@example.com]',
+        ])->render();
+
+        $banner = '<div style="background:#1a73e8;color:#fff;padding:10px 20px;'
+            . 'font-family:system-ui,sans-serif;font-size:13px;display:flex;'
+            . 'align-items:center;justify-content:space-between;position:sticky;top:0;z-index:9999;">'
+            . '<span>👁 Preview: <strong>' . e($campaign->name) . '</strong>'
+            . ' &nbsp;·&nbsp; Template: <code style="background:rgba(255,255,255,.2);'
+            . 'padding:1px 5px;border-radius:3px;">' . e($template) . '</code></span>'
+            . '<span style="opacity:.8;font-size:12px;">Links disabled in preview</span>'
+            . '</div>';
+
+        return response($banner . $html)->header('Content-Type', 'text/html');
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Test Send                                                            */
     /* ------------------------------------------------------------------ */
 
@@ -397,5 +463,23 @@ class CampaignController extends Controller
         }
 
         return $entries;
+    }
+
+    /** Fetch newsletter_settings GlobalSet, cached 1 hour (mirrors Mailable). */
+    private function campaignNewsletterSettings(): array
+    {
+        return cache()->remember('newsletter_settings', 3600, function () {
+            $set = GlobalSet::findByHandle('newsletter_settings');
+            return $set ? ($set->inDefaultSite()?->data()?->toArray() ?? []) : [];
+        });
+    }
+
+    /** Convert a Statamic asset path/object to a public URL (mirrors Mailable). */
+    private function campaignLogoUrl(mixed $value): ?string
+    {
+        if (! $value) return null;
+        if (is_string($value)) return asset('storage/' . ltrim($value, '/'));
+        if (is_object($value) && method_exists($value, 'url')) return $value->url();
+        return null;
     }
 }

@@ -36,13 +36,21 @@
                class="btn">Edit</a>
         @endif
 
+        {{-- Preview in browser --}}
+        <a href="{{ cp_route('newsletter.campaigns.preview', $campaign) }}"
+           target="_blank"
+           class="btn">
+            Preview &rarr;
+        </a>
+
         {{-- Test send --}}
         <div x-data="{ open: false }" class="relative">
-            <button @click="open = !open" class="btn">Send Test &hellip;</button>
+            <button @click="open = !open" class="btn btn-primary">Send Test Email &hellip;</button>
             <div x-show="open" x-cloak
                  @click.outside="open = false"
                  class="absolute right-0 top-full mt-1 w-72 bg-white border border-grey-20 rounded shadow-lg z-50 p-4">
-                <p class="text-sm font-medium mb-2">Send test email</p>
+                <p class="text-sm font-medium mb-1">Send test email to:</p>
+                <p class="text-xs text-grey-50 mb-2">Merge tags like <code>{{first_name}}</code> will show real values from the matched subscriber, or nothing if no match.</p>
                 <form method="POST"
                       action="{{ cp_route('newsletter.campaigns.test-send', $campaign) }}">
                     @csrf
