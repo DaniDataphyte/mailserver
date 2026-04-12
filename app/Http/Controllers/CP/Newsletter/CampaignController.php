@@ -244,6 +244,24 @@ class CampaignController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /* Reset Stuck Campaign to Draft                                       */
+    /* ------------------------------------------------------------------ */
+
+    public function resetToDraft(Campaign $campaign)
+    {
+        abort_if(
+            ! in_array($campaign->status, ['sending', 'failed']),
+            403,
+            'Only campaigns stuck in sending or failed state can be reset.'
+        );
+
+        $campaign->update(['status' => 'draft', 'sent_at' => null]);
+
+        return redirect(cp_route('newsletter.campaigns.show', $campaign))
+            ->with('success', 'Campaign reset to draft — you can send it again.');
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Send Now (from show/draft)                                           */
     /* ------------------------------------------------------------------ */
 

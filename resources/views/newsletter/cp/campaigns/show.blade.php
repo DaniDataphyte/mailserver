@@ -44,13 +44,17 @@
         </a>
 
         {{-- Test send --}}
-        <div x-data="{ open: false }" class="relative">
-            <button @click="open = !open" class="btn btn-primary">Send Test Email &hellip;</button>
-            <div x-show="open" x-cloak
-                 @click.outside="open = false"
-                 class="absolute right-0 top-full mt-1 w-72 bg-white border border-grey-20 rounded shadow-lg z-50 p-4">
+        <div class="relative">
+            <button onclick="document.getElementById('test-send-panel').classList.toggle('hidden')"
+                    class="btn btn-primary" type="button">
+                Send Test Email &hellip;
+            </button>
+            <div id="test-send-panel"
+                 class="hidden absolute right-0 top-full mt-1 w-80 bg-white border border-grey-20 rounded shadow-lg z-50 p-4">
                 <p class="text-sm font-medium mb-1">Send test email to:</p>
-                <p class="text-xs text-grey-50 mb-2">Merge tags like <code>@{{first_name}}</code>, <code>@{{last_name}}</code>, <code>@{{full_name}}</code>, <code>@{{email}}</code> — replaced with subscriber data, blank if not set.</p>
+                <p class="text-xs text-grey-50 mb-3">
+                    Merge tags (<code>@{{first_name}}</code>, <code>@{{full_name}}</code>, <code>@{{email}}</code>) are replaced with real subscriber data if the address matches a subscriber, otherwise blank.
+                </p>
                 <form method="POST"
                       action="{{ cp_route('newsletter.campaigns.test-send', $campaign) }}">
                     @csrf
@@ -244,6 +248,22 @@
             @endforelse
         </div>
 
+        {{-- Reset stuck campaign --}}
+        @if(in_array($campaign->status, ['sending','failed']))
+        <div class="card p-6 border-yellow-400">
+            <h2 class="text-sm font-semibold text-yellow-dark mb-2">Stuck?</h2>
+            <p class="text-xs text-grey-60 mb-3">If this campaign is stuck in "{{ $campaign->status }}" (e.g. queue worker not running), reset it to draft and send again.</p>
+            <form method="POST" action="{{ cp_route('newsletter.campaigns.reset', $campaign) }}">
+                @csrf
+                <button type="submit"
+                        onclick="return confirm('Reset this campaign back to draft?')"
+                        class="btn btn-sm w-full text-yellow-dark border-yellow-400">
+                    Reset to Draft
+                </button>
+            </form>
+        </div>
+        @endif
+
         {{-- Danger zone --}}
         @if(in_array($campaign->status, ['draft','scheduled']))
         <div class="card p-6 border-red-300">
@@ -261,5 +281,16 @@
 
     </div>
 </div>
+
+<script>
+// Close test-send panel when clicking outside it
+document.addEventListener('click', function (e) {
+    var panel  = document.getElementById('test-send-panel');
+    var toggle = e.target.closest('[onclick*="test-send-panel"]');
+    if (panel && !panel.contains(e.target) && !toggle) {
+        panel.classList.add('hidden');
+    }
+});
+</script>
 
 @endsection

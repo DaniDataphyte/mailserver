@@ -121,10 +121,11 @@ class NewsletterServiceProvider extends ServiceProvider
                     \Route::get('/{campaign}/edit',  [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'edit'])->name('edit');
                     \Route::put('/{campaign}',       [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'update'])->name('update');
                     \Route::delete('/{campaign}',    [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'destroy'])->name('destroy');
-                    \Route::post('/{campaign}/send',      [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'send'])->name('send');
-                    \Route::post('/{campaign}/cancel',    [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'cancel'])->name('cancel');
-                    \Route::post('/{campaign}/test-send', [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'testSend'])->name('test-send');
-                    \Route::get('/{campaign}/preview',    [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'preview'])->name('preview');
+                    \Route::post('/{campaign}/send',       [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'send'])->name('send');
+                    \Route::post('/{campaign}/cancel',     [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'cancel'])->name('cancel');
+                    \Route::post('/{campaign}/reset',      [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'resetToDraft'])->name('reset');
+                    \Route::post('/{campaign}/test-send',  [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'testSend'])->name('test-send');
+                    \Route::get('/{campaign}/preview',     [\App\Http\Controllers\CP\Newsletter\CampaignController::class, 'preview'])->name('preview');
                 });
 
                 // GDPR
