@@ -5,59 +5,142 @@
 ## Campaign Lifecycle
 
 ```
-Draft -> Scheduled -> Sending -> Sent
-  |                      |
-  +-> Cancelled          +-> Cancelled (partial)
+Draft → Scheduled → Sending → Sent
+  ↑          |          |
+  |     (cancel)   (reset to draft if stuck)
+  +←←←←←←←←←←←←←←←←←←←←←+
 ```
 
 ### Statuses
-- **Draft** - being created/edited, not yet scheduled
-- **Scheduled** - has a `scheduled_at` datetime, waiting to be dispatched
-- **Sending** - DispatchCampaignJob is running, emails being queued
-- **Sent** - all emails dispatched
-- **Cancelled** - manually cancelled (may have partial sends)
+
+| Status | Meaning |
+|---|---|
+| `draft` | Being created/edited, not yet sent |
+| `scheduled` | Has `scheduled_at` datetime set, waiting to dispatch |
+| `sending` | `DispatchCampaignJob` running, emails being sent |
+| `sent` | All emails dispatched |
+| `failed` | Job failed after all retries |
+
+> If a campaign gets stuck in `sending` (e.g. queue worker not running), use the **"Reset to Draft"** button on the campaign show page → it resets status and `sent_at` to null so you can resend.
 
 ---
 
-## Campaign Creation (Statamic CP)
+## The Send Workflow (Actual)
 
-### Fields
-- **Name** (internal reference)
-- **Subject** line
-- **From Name** / **From Email** / **Reply-To**
-- **Template** (select from email_templates)
-- **Content** (rich text editor for newsletter body)
-- **Audience** (multi-select: groups, sub-groups, or "All Subscribers")
-- **Schedule** (send now or pick date/time)
+### Step 1 — Write the content
+1. Go to Statamic CP → Collections → Foundation Newsletters (or Insight Newsletters)
+2. Click **New Entry**
+3. Choose a **blueprint** — this determines both the content fields and the email template:
+   - **Insight:** Feature Lead, Single Story, Digest, Newsroom Roundup, Breaking News, Data Story
+   - **Foundation:** Weekly Update, Activities, Project Update
+4. Fill in the content fields (title, subject, body via Bard, preheader, hero image, author)
+5. **Publish** the entry
 
-### Preview
-- Render the email template with content
-- Show recipient count based on audience selection
-- Send test email to admin address
+### Step 2 — Create and send the campaign
+1. Go to Newsletter → Campaigns → **New Campaign**
+2. Pick the **Collection** (Insight or Foundation)
+3. Pick the **Content Entry** — dropdown shows entries as `[Blueprint Name] Date — Title`
+4. Subject auto-fills from the entry (editable)
+5. Pick **Audience** — either "Send to All" or specific sub-groups
+6. **From / Reply-To** — leave blank to use collection defaults from `config/newsletter.php`
+7. Choose action: **Save Draft**, **Schedule**, or **Send Now**
+
+---
+
+## Sender Resolution
+
+`Campaign::sender()` resolves in priority order:
+
+```
+1. campaign.from_email / campaign.from_name  (if not null — editor override)
+2. config('newsletter.collections.{collection}.from_email')  (collection default)
+3. config('newsletter.from_email')  (global fallback)
+```
+
+`from_email`, `from_name`, and `reply_to` are **nullable** in the DB. Leaving them blank stores NULL and falls through to config defaults.
+
+---
+
+## Blueprint → Template Mapping
+
+Each blueprint has a hidden `template` field auto-filled on first save. `TemplateResolver` resolves in priority order:
+
+```
+1. Entry's stored template field  (if blade view exists)
+2. Convention: emails.{collection_without_newsletters}.{blueprint_handle_with_hyphens}
+3. emails.{collection}.default
+4. emails.layout  (bare fallback)
+```
+
+**Blueprint → template map:**
+
+| Collection | Blueprint | Template |
+|---|---|---|
+| insight_newsletters | feature_lead | `emails.insight.feature-lead` |
+| insight_newsletters | single_story | `emails.insight.single-story` |
+| insight_newsletters | digest | `emails.insight.digest` |
+| insight_newsletters | roundup | `emails.insight.roundup` |
+| insight_newsletters | breaking_news | `emails.insight.breaking` |
+| insight_newsletters | data_story | `emails.insight.data-story` |
+| foundation_newsletters | weekly | `emails.foundation.weekly` |
+| foundation_newsletters | activities | `emails.foundation.activities` |
+| foundation_newsletters | project_update | `emails.foundation.project-update` |
+
+---
+
+## Email Template Variables
+
+All templates receive these variables from `NewsletterMailable::content()`:
+
+| Variable | Source |
+|---|---|
+| `$subject` | Campaign subject |
+| `$preheader` | Entry `preheader` field |
+| `$heroImageUrl` | Entry `hero_image` asset |
+| `$content` | Entry Bard body (HTML, UTM-injected, merge tags applied) |
+| `$author` | Entry `author` field, fallback to sender from_name |
+| `$fromName` | Resolved sender name |
+| `$sentDate` | `campaign.sent_at` formatted, fallback `now()` |
+| `$collectionLogo` | GlobalSet `newsletter_settings.{collection}_logo` URL |
+| `$headerColor` | GlobalSet brand color or config fallback |
+| `$unsubscribeUrl` | Signed URL → `newsletter.unsubscribe.show` |
+| `$preferencesUrl` | Signed URL → `newsletter.preferences.show` |
+| `$subscriberFirstName` | `subscriber.first_name` |
+| `$subscriberLastName` | `subscriber.last_name` |
+| `$subscriberFullName` | `subscriber.full_name` or email fallback |
+| `$subscriberEmail` | `subscriber.email` |
+| `$newsletterSettings` | Full GlobalSet array (injected by view composer) |
+
+### Merge Tags (in Bard body content)
+
+Type these directly in the Bard editor body — they are replaced before send:
+
+| Tag | Replaced with |
+|---|---|
+| `{{first_name}}` | Subscriber first name (blank if not set) |
+| `{{last_name}}` | Subscriber last name (blank if not set) |
+| `{{full_name}}` | Subscriber full name (email if not set) |
+| `{{email}}` | Subscriber email address |
+
+> **In Blade template files**, always write `@{{first_name}}` (with `@` prefix) to output the literal text. Without `@`, Blade tries to evaluate `first_name` as a PHP constant.
 
 ---
 
 ## Audience Resolution
 
-The campaign audience resolver determines which subscribers receive the campaign.
+`AudienceResolver::resolve(Campaign $campaign)` works as follows:
 
-### Algorithm
 ```
 1. Collect all campaign_audiences rows for this campaign
 2. If any row has send_to_all = true:
-     -> Return all subscribers where status = 'active'
-3. For each audience row:
-     - If targetable_type = SubscriberGroup:
-         -> Get all sub_groups in that group
-         -> Get all active subscribers in those sub_groups
-     - If targetable_type = SubscriberSubGroup:
-         -> Get all active subscribers in that sub_group
-4. Merge all subscriber sets
-5. Deduplicate by subscriber.id
-6. Return unique subscriber collection
+     → Resolve the group from collection handle (insight → insight-subscribers, foundation → foundation)
+     → Return all active subscribers in that group (via sub_group pivot)
+3. For each targetable_type = subscriber_sub_group:
+     → Get all active subscribers in that sub_group
+4. Merge + deduplicate by subscriber.id
+5. Return unique subscriber collection
 ```
 
-### Key Rule
 A subscriber in multiple targeted sub-groups receives **exactly one email** per campaign.
 
 ---
@@ -66,104 +149,55 @@ A subscriber in multiple targeted sub-groups receives **exactly one email** per 
 
 ### DispatchCampaignJob (queue: `campaigns`)
 
-Runs when a scheduled campaign's time arrives or when "Send Now" is clicked.
-
-1. Set campaign status to `sending`
-2. Resolve audience (see above)
-3. Update `total_recipients` count
-4. Create `campaign_sends` rows with status `queued` for each subscriber
-5. Chunk subscribers into batches of 100
-6. Dispatch `SendNewsletterEmailJob` for each subscriber
-7. Set campaign status to `sent` when all jobs dispatched
+1. Load campaign, resolve audience via `AudienceResolver`
+2. Update `total_recipients`
+3. Create `campaign_sends` rows (`status = pending`) for each subscriber
+4. Dispatch `SendNewsletterEmailJob` per subscriber
+5. Set campaign `status = sent`
 
 ### SendNewsletterEmailJob (queue: `emails`)
 
-Sends one email to one subscriber.
+1. Load `CampaignSend` with campaign + subscriber
+2. Skip if status not `pending`/`failed` (idempotency)
+3. Mark `status = sending`, `sent_at = now()`
+4. Instantiate `NewsletterMailable`, send via configured mailer
+5. Extract Elastic Email transaction ID from response headers
+6. Mark `status = sent`; on failure: mark `status = failed`, rethrow for retry
 
-1. Load campaign and subscriber
-2. Check subscriber is still `active` (may have unsubscribed since queued)
-3. Render email template with subscriber-specific data (name, unsubscribe link)
-4. Send via Elastic Email mail driver
-5. Update campaign_send: status = `sent`, `sent_at` = now, store `elastic_email_message_id`
-6. On failure: update campaign_send status = `failed`, log error
-
-**Middleware:**
-- Rate limiting: max 15 concurrent (Elastic Email limit is 20)
-- Retries: 3 attempts with 60-second backoff
+**Middleware:** `RateLimited('newsletter-emails')` — max 15 concurrent
 
 ---
 
-## Email Template System
+## Browser Preview
 
-### Storage
-Templates are Blade files in `resources/views/emails/newsletters/`.
+`GET /cp/newsletter/campaigns/{campaign}/preview`
 
-### Available Variables in Templates
-```php
-$subscriber->email
-$subscriber->first_name
-$subscriber->last_name
-$campaign->subject
-$campaign->name
-$unsubscribeUrl       // Signed URL
-$preferencesUrl       // Signed URL
-$webVersionUrl        // View in browser link
-$physicalAddress      // CAN-SPAM required
-```
+Renders the resolved email template in the browser with a blue banner. Merge tags shown as `[First Name]` etc. Unsubscribe/Preferences links point to `#`. Safe for sharing for editorial review.
 
-### CSS Inlining
-Tailwind CSS classes are converted to inline styles at send time using `tijsverkoyen/css-to-inline-styles` (already included with Laravel).
+---
 
-### Base Template Structure
-```blade
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-    {{-- Preheader text --}}
-    <div style="display:none;">{{ $preheader ?? '' }}</div>
+## Test Send
 
-    {{-- Main content --}}
-    @yield('content')
+`POST /cp/newsletter/campaigns/{campaign}/test-send`
 
-    {{-- Footer (required) --}}
-    <footer>
-        <p>{{ $physicalAddress }}</p>
-        <a href="{{ $unsubscribeUrl }}">Unsubscribe</a>
-        <a href="{{ $preferencesUrl }}">Manage Preferences</a>
-    </footer>
-</body>
-</html>
-```
+Sends a real email via the configured mailer to a single address. If the address matches an existing subscriber, real subscriber data is used (including merge tags). Otherwise a synthetic subscriber is created (name: "Test Recipient").
 
-### Maizzle (Optional Enhancement)
-For production-quality responsive email templates, consider using Maizzle:
-- Tailwind-CSS-first email framework
-- Compiles to inline-styled HTML
-- Export as Blade views
-- Install separately: `npx create-maizzle`
+Does **not** create a `campaign_send` record and does **not** count toward campaign stats.
 
 ---
 
 ## Scheduling
 
 ### Immediate Send
-1. Admin clicks "Send Now"
-2. `DispatchCampaignJob` is dispatched immediately to the `campaigns` queue
+Click **Send Now** on the campaign create/edit form → sets `sent_at = now()`, status → `sending`, dispatches `DispatchCampaignJob`.
 
 ### Scheduled Send
-1. Admin sets `scheduled_at` datetime
-2. Campaign status set to `scheduled`
-3. Every 5 minutes, `campaigns:dispatch-scheduled` artisan command runs
-4. Command finds campaigns where `scheduled_at <= now()` and `status = scheduled`
-5. Dispatches `DispatchCampaignJob` for each
+Select **Schedule** radio → pick a future datetime → sets `scheduled_at`, status → `scheduled`.
+
+The Laravel scheduler (`php artisan schedule:run` every minute via cron) dispatches `DispatchCampaignJob` when `scheduled_at ≤ now()`.
 
 ---
 
-## Cancellation
+## CP Route Note
 
-- **Draft/Scheduled:** Set status to `cancelled`, no emails sent
-- **Sending:** Set status to `cancelled`, remaining queued `campaign_sends` are skipped (the SendNewsletterEmailJob checks campaign status before sending)
+All campaign controller redirects use `cp_route()` (not `route()`). Routes are registered via `Statamic::pushCpRoutes()` which adds the `statamic.cp.` namespace prefix. `cp_route('newsletter.campaigns.show', $campaign)` resolves to `statamic.cp.newsletter.campaigns.show`.

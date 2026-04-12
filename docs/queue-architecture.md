@@ -1,13 +1,20 @@
 # Queue Architecture
 
-Redis-backed queues managed by Laravel's queue system with Supervisor on Cloudways.
-
 ---
 
-## Queue Configuration
+## Dev vs Production
 
-### `.env`
+### Development (Herd)
+
+```env
+QUEUE_CONNECTION=sync
 ```
+
+With `sync`, all jobs run **immediately in-process** — no worker needed. The "Send Now" button waits while emails are sent, then redirects. This is the correct setting for local development and Mailtrap testing.
+
+### Production (Cloudways)
+
+```env
 QUEUE_CONNECTION=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
@@ -15,128 +22,152 @@ REDIS_DB=0
 REDIS_CACHE_DB=1
 ```
 
-### Queues
+With `redis`, jobs are queued in Redis and processed by a Supervisor-managed worker (see below). Emails send asynchronously — the "Send Now" button returns immediately while sending happens in the background.
 
-| Queue | Purpose | Workers | Priority |
-|---|---|---|---|
-| `campaigns` | DispatchCampaignJob (fans out emails) | 1 | High |
-| `emails` | SendNewsletterEmailJob (individual sends) | 3 | Default |
-| `webhooks` | ProcessWebhookJob (Elastic Email events) | 1 | High |
-| `tracking` | BatchTrackingUpdateJob (aggregate DB writes) | 1 | Low |
+---
+
+## Queues
+
+| Queue | Job | Priority |
+|---|---|---|
+| `campaigns` | `DispatchCampaignJob` — fans out to individual send jobs | High |
+| `emails` | `SendNewsletterEmailJob` — sends one email per subscriber | Default |
+| `webhooks` | `ProcessWebhookJob` — processes Elastic Email event callbacks | High |
 
 ---
 
 ## Job Definitions
 
-### DispatchCampaignJob
-- **Queue:** `campaigns`
-- **Timeout:** 600 seconds (10 min, large campaigns)
-- **Retries:** 1 (critical failure = investigate manually)
-- **Does:** Resolves audience, creates campaign_sends rows, dispatches individual SendNewsletterEmailJob
+### DispatchCampaignJob — `queue: campaigns`
+- **Timeout:** 600 s (10 min — allows large campaigns)
+- **Tries:** 1 (failure = investigate manually)
+- **Does:** Resolves audience, creates `campaign_sends` rows, dispatches `SendNewsletterEmailJob` per subscriber, sets campaign `status = sent`
 
-### SendNewsletterEmailJob
-- **Queue:** `emails`
-- **Timeout:** 30 seconds
-- **Retries:** 3
-- **Backoff:** 60 seconds between retries
-- **Rate limit:** 15 concurrent (via spatie/laravel-rate-limited-job-middleware)
-- **Does:** Sends one email, updates campaign_send status
+### SendNewsletterEmailJob — `queue: emails`
+- **Timeout:** 60 s
+- **Tries:** 3
+- **Backoff:** 60 s, 120 s, 300 s
+- **Rate limiting:** `RateLimited('newsletter-emails')` middleware — 15 concurrent max
+- **Does:** Sends one email to one subscriber via `NewsletterMailable`, stores Elastic Email transaction ID
 
-### ProcessWebhookJob
-- **Queue:** `webhooks`
-- **Timeout:** 30 seconds
-- **Retries:** 3
-- **Does:** Parses Elastic Email webhook payload, updates campaign_sends and subscriber status
-
-### BatchTrackingUpdateJob
-- **Queue:** `tracking`
-- **Timeout:** 60 seconds
-- **Retries:** 3
-- **Does:** Aggregates open/click events, batch-writes to DB to reduce load
+### ProcessWebhookJob — `queue: webhooks`
+- **Timeout:** 30 s
+- **Tries:** 3
+- **Does:** Parses Elastic Email webhook events (delivered, opened, clicked, bounced, unsubscribed, complained), updates `campaign_sends` and `subscribers.status`
 
 ---
 
-## Supervisor Configuration (Cloudways)
+## Stuck Campaign Recovery
 
-Configure via Application > Supervisor Jobs in Cloudways dashboard.
+If a campaign is stuck in `sending` status (e.g. queue worker stopped, `sync` mode with a crash):
 
-### Worker 1: High Priority
-```
-php artisan queue:work redis --queue=campaigns,webhooks --sleep=3 --tries=3 --timeout=600
-```
+1. Go to Newsletter → Campaigns → open the stuck campaign
+2. Click **"Reset to Draft"** in the yellow "Stuck?" card
+3. Resend the campaign
 
-### Worker 2-4: Email Sending (3 workers)
-```
-php artisan queue:work redis --queue=emails --sleep=3 --tries=3 --timeout=30
-```
-
-### Worker 5: Low Priority
-```
-php artisan queue:work redis --queue=tracking --sleep=10 --tries=3 --timeout=60
-```
+This resets `status = draft` and `sent_at = null`. Already-sent `campaign_sends` rows are preserved so duplicate sends don't occur (the job skips `CampaignSend` records that aren't `pending`/`failed`).
 
 ---
 
-## Laravel Horizon (Alternative)
+## Supervisor Configuration (Cloudways Production)
 
-If Cloudways allows custom Supervisor commands (may require Advanced support plan):
+Configure via **Application → Supervisor Jobs** in the Cloudways dashboard, or `supervisord.conf`:
 
+### Worker 1 — High Priority (campaigns + webhooks)
+```ini
+[program:mailserver-high]
+command=php /path/to/artisan queue:work redis --queue=campaigns,webhooks --sleep=3 --tries=3 --timeout=600
+autostart=true
+autorestart=true
+numprocs=1
 ```
+
+### Workers 2–4 — Email Sending (3 parallel workers)
+```ini
+[program:mailserver-emails]
+command=php /path/to/artisan queue:work redis --queue=emails --sleep=3 --tries=3 --timeout=60
+autostart=true
+autorestart=true
+numprocs=3
+```
+
+> On Cloudways, set the **"Processes"** count to 3 for the emails worker to get 3 parallel senders.
+
+---
+
+## Laravel Horizon (Optional Enhancement)
+
+For a dashboard UI with queue metrics:
+
+```bash
 composer require laravel/horizon
 php artisan horizon:install
 ```
 
-### `config/horizon.php`
+Dashboard available at `/horizon`. Auto-balances workers based on queue depth.
+
 ```php
+// config/horizon.php
 'environments' => [
     'production' => [
-        'supervisor-campaigns' => [
+        'supervisor-high' => [
             'connection' => 'redis',
-            'queue' => ['campaigns', 'webhooks'],
-            'balance' => 'simple',
-            'processes' => 2,
-            'tries' => 3,
-            'timeout' => 600,
+            'queue'      => ['campaigns', 'webhooks'],
+            'balance'    => 'simple',
+            'processes'  => 2,
+            'tries'      => 3,
+            'timeout'    => 600,
         ],
         'supervisor-emails' => [
-            'connection' => 'redis',
-            'queue' => ['emails'],
-            'balance' => 'auto',
+            'connection'   => 'redis',
+            'queue'        => ['emails'],
+            'balance'      => 'auto',
             'minProcesses' => 2,
             'maxProcesses' => 5,
-            'tries' => 3,
-            'timeout' => 30,
-        ],
-        'supervisor-tracking' => [
-            'connection' => 'redis',
-            'queue' => ['tracking'],
-            'balance' => 'simple',
-            'processes' => 1,
-            'tries' => 3,
-            'timeout' => 60,
+            'tries'        => 3,
+            'timeout'      => 60,
         ],
     ],
 ],
 ```
 
-Benefits: Dashboard UI at `/horizon`, auto-balancing, metrics, failed job management.
-
 ---
 
 ## Failure Handling
 
-### Retry Strategy
-- Failed jobs go to `failed_jobs` table after exhausting retries
-- Daily cleanup: `queue:prune-failed --hours=168` (7 days)
-- Monitor via `php artisan queue:failed` or Horizon dashboard
+### Failed Jobs
+Failed jobs (after all retries exhausted) go to the `failed_jobs` table.
 
-### Dead Letter Alerting
-Create a `FailedJobListener` that triggers on `Queue::failing`:
-- Log the error
-- Optionally notify admin (Slack, email) if failure count exceeds threshold
+```bash
+# View failed jobs
+php artisan queue:failed
 
-### Circuit Breaker
-If Elastic Email returns 5xx errors consistently:
-- Jobs back off with exponential delay
-- After N consecutive failures, pause the `emails` queue
-- Alert admin to investigate Elastic Email status
+# Retry a specific failed job
+php artisan queue:retry {id}
+
+# Retry all failed jobs
+php artisan queue:retry all
+
+# Prune old failures (keep 7 days)
+php artisan queue:prune-failed --hours=168
+```
+
+### Scheduled Cleanup
+Add to `app/Console/Kernel.php` scheduler:
+```php
+$schedule->command('queue:prune-failed --hours=168')->weekly();
+```
+
+---
+
+## Rate Limiter Registration
+
+The `newsletter-emails` rate limiter is registered in `AppServiceProvider` (or `NewsletterServiceProvider`):
+
+```php
+RateLimiter::for('newsletter-emails', function ($job) {
+    return Limit::perMinute(15);
+});
+```
+
+This caps `SendNewsletterEmailJob` at 15 concurrent executions, staying within Elastic Email's fair-use limit.
