@@ -39,9 +39,16 @@ class DispatchCampaignJob implements ShouldQueue
             return;
         }
 
-        // Guard: only dispatch draft or scheduled campaigns
-        if (! in_array($campaign->status, ['draft', 'scheduled'])) {
+        // Guard: only process campaigns not yet dispatched (total_recipients=0 allows
+        // re-entry when the controller has already set status to 'sending').
+        if (! in_array($campaign->status, ['draft', 'scheduled', 'sending'])) {
             Log::info("DispatchCampaignJob: campaign {$campaign->id} status={$campaign->status} — skipping");
+            return;
+        }
+
+        // If already sending with recipients, a prior job handled it — bail out.
+        if ($campaign->status === 'sending' && $campaign->total_recipients > 0) {
+            Log::info("DispatchCampaignJob: campaign {$campaign->id} already dispatched ({$campaign->total_recipients} recipients) — skipping");
             return;
         }
 
