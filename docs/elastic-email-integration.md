@@ -84,7 +84,7 @@ public function middleware(): array
 
 ### Elastic Email Dashboard Setup
 Settings > Notifications > Add Notification:
-- **URL:** `https://yourdomain.com/api/webhooks/elastic-email`
+- **URL:** `https://yourdomain.com/webhooks/elastic-email`
 - **Events:** Sent, Opened, Clicked, Bounced, Unsubscribed, Complained
 
 ### Critical Notes

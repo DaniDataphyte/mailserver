@@ -134,7 +134,7 @@ php artisan queue:restart
 ## Monitoring
 
 ### Webhook Endpoint
-- Set up UptimeRobot or similar to monitor `https://yourdomain.com/api/webhooks/elastic-email`
+- Set up UptimeRobot or similar to monitor `https://yourdomain.com/webhooks/elastic-email`
 - Alert if endpoint goes down (Elastic Email disables webhooks after 1000 consecutive failures)
 
 ### Queue Health

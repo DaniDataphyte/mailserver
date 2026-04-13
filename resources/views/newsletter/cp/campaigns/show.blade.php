@@ -101,11 +101,34 @@
         {{-- Stats cards --}}
         <div class="grid grid-cols-4 gap-4">
             @php
+                $totalRecipients = $stats['total_recipients'] ?? 0;
+                $sentCount = $stats['total_sent'] ?? 0;
+                $deliveredCount = $stats['total_delivered'] ?? 0;
                 $statCards = [
-                    ['label' => 'Sent',      'value' => $stats['total_sent']      ?? 0, 'color' => 'text-grey-80'],
-                    ['label' => 'Delivered', 'value' => $stats['total_delivered'] ?? 0, 'color' => 'text-green-dark'],
-                    ['label' => 'Opened',    'value' => $stats['total_opened']    ?? 0, 'color' => 'text-blue-dark'],
-                    ['label' => 'Failed',    'value' => $stats['total_failed']    ?? 0, 'color' => 'text-red-dark'],
+                    [
+                        'label' => 'Sent',
+                        'value' => $sentCount,
+                        'color' => 'text-grey-80',
+                        'percentage' => $totalRecipients > 0 ? round(($sentCount / $totalRecipients) * 100, 1) : null,
+                    ],
+                    [
+                        'label' => 'Delivered',
+                        'value' => $deliveredCount,
+                        'color' => 'text-green-dark',
+                        'percentage' => $sentCount > 0 ? round(($deliveredCount / $sentCount) * 100, 1) : null,
+                    ],
+                    [
+                        'label' => 'Opened',
+                        'value' => $stats['total_opened'] ?? 0,
+                        'color' => 'text-blue-dark',
+                        'percentage' => $deliveredCount > 0 ? round((($stats['total_opened'] ?? 0) / $deliveredCount) * 100, 1) : null,
+                    ],
+                    [
+                        'label' => 'Failed',
+                        'value' => $stats['total_failed'] ?? 0,
+                        'color' => 'text-red-dark',
+                        'percentage' => $totalRecipients > 0 ? round((($stats['total_failed'] ?? 0) / $totalRecipients) * 100, 1) : null,
+                    ],
                 ];
             @endphp
             @foreach($statCards as $card)
@@ -114,9 +137,9 @@
                     {{ number_format($card['value']) }}
                 </p>
                 <p class="text-sm text-grey-60 mt-1">{{ $card['label'] }}</p>
-                @if($stats['total_sent'] > 0 && in_array($card['label'], ['Delivered','Opened','Failed']))
+                @if($card['percentage'] !== null)
                 <p class="text-xs text-grey-50 mt-0.5">
-                    {{ round(($card['value'] / $stats['total_sent']) * 100, 1) }}%
+                    {{ $card['percentage'] }}%
                 </p>
                 @endif
             </div>

@@ -66,7 +66,7 @@ Start with `p=none` (monitor only), move to `p=quarantine` after 2 weeks of clea
 Once the domain is verified, set up webhooks so tracking events reach your app:
 
 1. elasticemail.com > Settings > Notifications > Add Notification
-2. **URL:** `https://yourdomain.com/api/webhooks/elastic-email`
+2. **URL:** `https://yourdomain.com/webhooks/elastic-email`
 3. **Enable events:** Sent, Delivered, Opened, Clicked, Bounced, Unsubscribed, Complained
 4. Save
 

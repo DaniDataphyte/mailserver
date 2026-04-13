@@ -6,14 +6,14 @@
 
 ### Setup in Elastic Email Dashboard
 Settings > Notifications > Add Notification:
-- URL: `https://yourdomain.com/api/webhooks/elastic-email`
+- URL: `https://yourdomain.com/webhooks/elastic-email`
 - Events: Sent, Opened, Clicked, Bounced, Unsubscribed, Complained
 - Content type: JSON
 
 ### Route Definition
 ```php
-// routes/api.php
-Route::match(['get', 'post'], '/webhooks/elastic-email', [WebhookController::class, 'handle'])
+// routes/web.php
+Route::match(['get', 'post'], '/webhooks/elastic-email', [WebhookController::class, 'receive'])
     ->name('webhooks.elastic-email');
 ```
 
@@ -21,13 +21,13 @@ GET requests must return `200 OK` (Elastic Email validation check).
 
 ### Webhook Security
 - Verify requests originate from Elastic Email (IP allowlist or shared secret in URL)
-- Exempt route from CSRF middleware (it's in `routes/api.php`)
+- Exempt route from CSRF middleware
 - Rate limit: `throttle:1000,1` (high throughput for webhook events)
 
 ### Event Processing
 
 ```php
-// WebhookController@handle
+// WebhookController@receive
 public function handle(Request $request)
 {
     if ($request->isMethod('get')) {

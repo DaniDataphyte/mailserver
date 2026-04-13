@@ -10,7 +10,7 @@ tracking by setting up webhooks directly in your Elastic Email account (not Clou
 
 ### One-time setup in elasticemail.com
 Settings > Notifications > Add notification:
-- URL: `https://yourdomain.com/api/webhooks/elastic-email`
+- URL: `https://yourdomain.com/webhooks/elastic-email`
 - Events to enable: Sent, Delivered, Opened, Clicked, Bounced, Unsubscribed, Complained
 
 All events are stored in the local `campaign_sends` table. Every metric displayed in
@@ -122,7 +122,7 @@ Elastic Email SMTP send
     ↓
 Elastic Email servers detect: open / click / bounce / delivered
     ↓
-POST to https://yourdomain.com/api/webhooks/elastic-email
+POST to https://yourdomain.com/webhooks/elastic-email
     ↓
 ProcessWebhookJob (queued, async)
     ↓

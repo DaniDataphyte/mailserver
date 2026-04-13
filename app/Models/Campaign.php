@@ -73,9 +73,11 @@ class Campaign extends Model
     {
         return $this->sends()
             ->selectRaw('
-                COUNT(*) as total_sent,
+                COUNT(*) as total_recipients,
+                SUM(status IN ("sent","delivered","opened","clicked")) as total_sent,
+                SUM(status = "queued") as total_queued,
                 SUM(status IN ("delivered","opened","clicked")) as total_delivered,
-                SUM(status IN ("failed","bounced")) as total_failed,
+                SUM(status IN ("failed","bounced","complained")) as total_failed,
                 SUM(opened_at IS NOT NULL) as total_opened,
                 SUM(status IN ("delivered","opened","clicked") AND opened_at IS NULL) as total_unread
             ')
