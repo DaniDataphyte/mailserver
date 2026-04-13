@@ -37,7 +37,7 @@ class SendNewsletterEmailJob implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new RateLimited('newsletter-emails'))->dontRelease(),
+            new RateLimited('newsletter-emails'),
         ];
     }
 
