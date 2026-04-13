@@ -56,6 +56,8 @@ Route::post('/preferences/{token}', [PreferencesController::class, 'update'])
     ->name('newsletter.preferences.update');
 
 // Elastic Email webhook endpoint — public, no CSRF (raw POST from Elastic Email)
+// GET returns 200 so Elastic Email's URL validator passes
+Route::get('/webhooks/elastic-email', fn () => response('OK', 200));
 Route::post('/webhooks/elastic-email', [WebhookController::class, 'receive'])
     ->name('newsletter.webhook.elastic-email')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
