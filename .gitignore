@@ -16,9 +16,9 @@
 /public/build
 /public/hot
 /public/static
-/public/storage
+
 /public/vendor/statamic
-/storage/*.key
+database/dumps/
 /storage/pail
 /vendor
 _ide_helper.php

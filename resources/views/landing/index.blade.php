@@ -12,7 +12,7 @@
             --dark:    #0a0f1e;
             --dark-2:  #111827;
             --dark-3:  #1f2937;
-            --accent:  #6366f1;
+            --accent:  #316a81;
             --accent-2:#818cf8;
             --green:   #10b981;
             --red:     #ef4444;
