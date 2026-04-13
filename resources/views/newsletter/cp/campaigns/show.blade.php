@@ -123,11 +123,16 @@
             @endforeach
         </div>
 
-        {{-- Recent sends --}}
-        @if($recentSends->isNotEmpty())
+        {{-- Sends --}}
+        @if($sends->isNotEmpty())
         <div class="card p-0 overflow-hidden">
-            <div class="p-4 border-b border-grey-20">
-                <h2 class="font-semibold">Recent Sends</h2>
+            <div class="p-4 border-b border-grey-20 flex items-center justify-between">
+                <h2 class="font-semibold">Sends</h2>
+                <span class="text-xs text-grey-50">
+                    {{ number_format($sends->total()) }} total
+                    &nbsp;&middot;&nbsp;
+                    page {{ $sends->currentPage() }} of {{ $sends->lastPage() }}
+                </span>
             </div>
             <table class="data-table">
                 <thead>
@@ -140,7 +145,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($recentSends as $send)
+                    @foreach($sends as $send)
                     <tr>
                         <td class="text-sm">
                             @if($send->subscriber)
@@ -170,9 +175,34 @@
                     @endforeach
                 </tbody>
             </table>
-            @if($campaign->sends()->count() > 20)
-            <div class="p-3 text-center text-xs text-grey-50 border-t border-grey-20">
-                Showing 20 of {{ number_format($campaign->sends()->count()) }} sends.
+
+            {{-- Pagination --}}
+            @if($sends->hasPages())
+            <div class="p-4 border-t border-grey-20 flex items-center justify-between">
+                <span class="text-xs text-grey-50">
+                    Showing {{ $sends->firstItem() }}–{{ $sends->lastItem() }} of {{ number_format($sends->total()) }}
+                </span>
+                <div class="flex items-center gap-1">
+                    @if($sends->onFirstPage())
+                        <span class="btn btn-sm opacity-40 cursor-not-allowed">&laquo; Prev</span>
+                    @else
+                        <a href="{{ $sends->previousPageUrl() }}" class="btn btn-sm">&laquo; Prev</a>
+                    @endif
+
+                    @foreach($sends->getUrlRange(max(1, $sends->currentPage()-2), min($sends->lastPage(), $sends->currentPage()+2)) as $page => $url)
+                        @if($page === $sends->currentPage())
+                            <span class="btn btn-sm btn-primary">{{ $page }}</span>
+                        @else
+                            <a href="{{ $url }}" class="btn btn-sm">{{ $page }}</a>
+                        @endif
+                    @endforeach
+
+                    @if($sends->hasMorePages())
+                        <a href="{{ $sends->nextPageUrl() }}" class="btn btn-sm">Next &raquo;</a>
+                    @else
+                        <span class="btn btn-sm opacity-40 cursor-not-allowed">Next &raquo;</span>
+                    @endif
+                </div>
             </div>
             @endif
         </div>

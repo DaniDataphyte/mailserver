@@ -115,7 +115,7 @@ class CampaignController extends Controller
 
     public function show(Campaign $campaign)
     {
-        $campaign->load('audiences.targetable', 'sends');
+        $campaign->load('audiences.targetable');
 
         $stats = $campaign->stats();
 
@@ -123,13 +123,13 @@ class CampaignController extends Controller
             ? Entry::find($campaign->entry_id)
             : null;
 
-        $recentSends = $campaign->sends()
+        $sends = $campaign->sends()
             ->with('subscriber')
             ->latest('sent_at')
-            ->limit(20)
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
 
-        return view('newsletter.cp.campaigns.show', compact('campaign', 'stats', 'entry', 'recentSends'));
+        return view('newsletter.cp.campaigns.show', compact('campaign', 'stats', 'entry', 'sends'));
     }
 
     /* ------------------------------------------------------------------ */
