@@ -105,10 +105,4 @@ class DispatchCampaignJob implements ShouldQueue
         }
     }
 
-    /* ------------------------------------------------------------------ */
-
-    public function queue(): string
-    {
-        return 'campaigns';
-    }
 }

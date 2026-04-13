@@ -141,10 +141,4 @@ class SendNewsletterEmailJob implements ShouldQueue
         return null;
     }
 
-    /* ------------------------------------------------------------------ */
-
-    public function queue(): string
-    {
-        return 'emails';
-    }
 }
