@@ -28,9 +28,9 @@ class ImportController extends Controller
         $file   = $request->file('csv_file');
         $handle = fopen($file->getRealPath(), 'r');
 
-        // Read header row
-        $headers = array_map('trim', fgetcsv($handle));
-        $headers = array_map('strtolower', $headers);
+        // Read header row — normalise to snake_case and resolve aliases
+        $rawHeaders = array_map('trim', fgetcsv($handle));
+        $headers    = array_map([$this, 'normaliseHeader'], $rawHeaders);
 
         $imported = 0;
         $skipped  = 0;
@@ -177,5 +177,32 @@ class ImportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Normalise a CSV header to snake_case and resolve common aliases.
+     * e.g. "Email Address" → "email", "First Name" → "first_name"
+     */
+    private function normaliseHeader(string $header): string
+    {
+        $aliases = [
+            'email address'  => 'email',
+            'email_address'  => 'email',
+            'e-mail'         => 'email',
+            'first name'     => 'first_name',
+            'firstname'      => 'first_name',
+            'last name'      => 'last_name',
+            'lastname'       => 'last_name',
+            'surname'        => 'last_name',
+            'sub groups'     => 'sub_groups',
+            'subgroups'      => 'sub_groups',
+            'group'          => 'sub_groups',
+            'groups'         => 'sub_groups',
+        ];
+
+        $normalised = strtolower(trim($header));
+        $normalised = preg_replace('/\s+/', ' ', $normalised); // collapse spaces
+
+        return $aliases[$normalised] ?? str_replace(' ', '_', $normalised);
     }
 }
