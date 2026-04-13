@@ -200,9 +200,9 @@ return [
         // Campaign dispatch — fans out individual email jobs
         'supervisor-campaigns' => [
             'connection' => 'redis',
-            'queue' => ['campaigns', 'webhooks'],
+            'queue' => ['campaigns'],
             'balance' => 'simple',
-            'maxProcesses' => 2,
+            'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
@@ -216,19 +216,19 @@ return [
             'queue' => ['emails'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'minProcesses' => 2,
-            'maxProcesses' => 5,
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 3,
-            'timeout' => 30,
+            'timeout' => 90,
             'nice' => 0,
         ],
-        // Low-priority batch tracking updates
+        // Low-priority tracking and miscellaneous queue work
         'supervisor-tracking' => [
             'connection' => 'redis',
-            'queue' => ['tracking', 'default'],
+            'queue' => ['webhooks', 'tracking', 'default'],
             'balance' => 'simple',
             'maxProcesses' => 1,
             'maxTime' => 0,
@@ -243,18 +243,18 @@ return [
     'environments' => [
         'production' => [
             'supervisor-campaigns' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 1,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
             'supervisor-emails' => [
-                'minProcesses' => 3,
-                'maxProcesses' => 8,
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 3,
             ],
             'supervisor-tracking' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 1,
             ],
         ],
 

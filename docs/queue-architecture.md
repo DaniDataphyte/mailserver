@@ -71,27 +71,41 @@ This resets `status = draft` and `sent_at = null`. Already-sent `campaign_sends`
 
 ## Supervisor Configuration (Cloudways Production)
 
-Configure via **Application → Supervisor Jobs** in the Cloudways dashboard, or `supervisord.conf`:
+Cloudways' Supervisor UI accepts a single queue name per job, so configure separate jobs via
+**Application → Supervisor Jobs** instead of relying on comma-separated queue lists.
 
-### Worker 1 — High Priority (campaigns + webhooks)
-```ini
-[program:mailserver-high]
-command=php /path/to/artisan queue:work redis --queue=campaigns,webhooks --sleep=3 --tries=3 --timeout=600
-autostart=true
-autorestart=true
-numprocs=1
-```
+### Recommended lean setup for a 1 GB server
 
-### Workers 2–4 — Email Sending (3 parallel workers)
-```ini
-[program:mailserver-emails]
-command=php /path/to/artisan queue:work redis --queue=emails --sleep=3 --tries=3 --timeout=60
-autostart=true
-autorestart=true
-numprocs=3
-```
+### Job 1 — Campaign Dispatch
+- Queue: `campaigns`
+- Processes: `1`
+- Timeout: `660`
+- Sleep Time: `3`
+- Tries: `3`
 
-> On Cloudways, set the **"Processes"** count to 3 for the emails worker to get 3 parallel senders.
+### Job 2 — Email Sending
+- Queue: `emails`
+- Processes: `2`
+- Timeout: `90`
+- Sleep Time: `3`
+- Tries: `3`
+
+### Job 3 — Webhook Processing
+- Queue: `webhooks`
+- Processes: `1`
+- Timeout: `60`
+- Sleep Time: `3`
+- Tries: `3`
+
+### Job 4 — Default Queue
+- Queue: `default`
+- Processes: `1`
+- Timeout: `60`
+- Sleep Time: `3`
+- Tries: `3`
+
+If the server is under pressure, reduce `emails` to `1` process temporarily. If a large campaign
+needs more throughput, increase only the `emails` job and scale it back down afterward.
 
 ---
 
@@ -110,22 +124,30 @@ Dashboard available at `/horizon`. Auto-balances workers based on queue depth.
 // config/horizon.php
 'environments' => [
     'production' => [
-        'supervisor-high' => [
+        'supervisor-campaigns' => [
             'connection' => 'redis',
-            'queue'      => ['campaigns', 'webhooks'],
+            'queue'      => ['campaigns'],
             'balance'    => 'simple',
-            'processes'  => 2,
+            'processes'  => 1,
             'tries'      => 3,
-            'timeout'    => 600,
+            'timeout'    => 660,
         ],
         'supervisor-emails' => [
             'connection'   => 'redis',
             'queue'        => ['emails'],
             'balance'      => 'auto',
-            'minProcesses' => 2,
-            'maxProcesses' => 5,
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
             'tries'        => 3,
-            'timeout'      => 60,
+            'timeout'      => 90,
+        ],
+        'supervisor-tracking' => [
+            'connection' => 'redis',
+            'queue'      => ['webhooks', 'tracking', 'default'],
+            'balance'    => 'simple',
+            'processes'  => 1,
+            'tries'      => 3,
+            'timeout'    => 60,
         ],
     ],
 ],

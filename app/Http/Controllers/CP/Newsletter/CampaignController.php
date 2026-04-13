@@ -74,11 +74,7 @@ class CampaignController extends Controller
             'scheduled_at' => 'required_if:action,schedule|nullable|date|after:now',
         ]);
 
-        $status      = match ($data['action']) {
-            'schedule' => 'scheduled',
-            'send'     => 'sending',
-            default    => 'draft',
-        };
+        $status = $data['action'] === 'schedule' ? 'scheduled' : 'draft';
 
         $campaign = Campaign::create([
             'name'         => $data['name'],
@@ -90,7 +86,7 @@ class CampaignController extends Controller
             'reply_to'     => $this->blankToNull($data['reply_to']   ?? null),
             'status'       => $status,
             'scheduled_at' => $data['action'] === 'schedule' ? $data['scheduled_at'] : null,
-            'sent_at'      => $data['action'] === 'send' ? now() : null,
+            'sent_at'      => null,
             'created_by'   => auth()->id(),
         ]);
 
@@ -98,6 +94,8 @@ class CampaignController extends Controller
 
         if ($data['action'] === 'send') {
             DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
+            $this->markCampaignAsQueuedForDispatch($campaign);
+
             return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('success', 'Campaign is being dispatched.');
         }
@@ -180,11 +178,7 @@ class CampaignController extends Controller
             'scheduled_at' => 'required_if:action,schedule|nullable|date|after:now',
         ]);
 
-        $status = match ($data['action']) {
-            'schedule' => 'scheduled',
-            'send'     => 'sending',
-            default    => 'draft',
-        };
+        $status = $data['action'] === 'schedule' ? 'scheduled' : 'draft';
 
         $campaign->update([
             'name'         => $data['name'],
@@ -196,13 +190,15 @@ class CampaignController extends Controller
             'reply_to'     => $this->blankToNull($data['reply_to']   ?? null),
             'status'       => $status,
             'scheduled_at' => $data['action'] === 'schedule' ? $data['scheduled_at'] : null,
-            'sent_at'      => $data['action'] === 'send' ? now() : null,
+            'sent_at'      => null,
         ]);
 
         $this->syncAudiences($campaign, $data);
 
         if ($data['action'] === 'send') {
             DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
+            $this->markCampaignAsQueuedForDispatch($campaign);
+
             return redirect(cp_route('newsletter.campaigns.show', $campaign))
                 ->with('success', 'Campaign is being dispatched.');
         }
@@ -273,9 +269,8 @@ class CampaignController extends Controller
             'Campaign cannot be sent in its current state.'
         );
 
-        $campaign->update(['status' => 'sending', 'sent_at' => now()]);
-
         DispatchCampaignJob::dispatch($campaign->id)->onQueue('campaigns');
+        $this->markCampaignAsQueuedForDispatch($campaign);
 
         return redirect(cp_route('newsletter.campaigns.show', $campaign))
             ->with('success', 'Campaign is being dispatched to the queue.');
@@ -424,6 +419,15 @@ class CampaignController extends Controller
                 'send_to_all'     => false,
             ]);
         }
+    }
+
+    private function markCampaignAsQueuedForDispatch(Campaign $campaign): void
+    {
+        $campaign->forceFill([
+            'status'       => 'sending',
+            'sent_at'      => now(),
+            'scheduled_at' => null,
+        ])->save();
     }
 
     private function collectionOptions(): array

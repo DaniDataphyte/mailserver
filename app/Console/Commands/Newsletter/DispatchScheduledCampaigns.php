@@ -24,6 +24,11 @@ class DispatchScheduledCampaigns extends Command
             DispatchCampaignJob::dispatch($campaign->id)
                 ->onQueue('campaigns');
 
+            $campaign->forceFill([
+                'status'  => 'sending',
+                'sent_at' => now(),
+            ])->save();
+
             $this->info("Dispatched campaign #{$campaign->id}: {$campaign->name}");
         }
 
