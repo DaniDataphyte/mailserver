@@ -7,6 +7,7 @@ use App\Models\Subscriber;
 use App\Models\SubscriberSubGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ImportController extends Controller
 {
@@ -92,11 +93,17 @@ class ImportController extends Controller
                     $subscriber = Subscriber::firstOrCreate(
                         ['email' => $email],
                         [
-                            'first_name' => trim($rowData['first_name'] ?? ''),
-                            'last_name'  => trim($rowData['last_name'] ?? ''),
-                            'status'     => 'active',
+                            'first_name'         => trim($rowData['first_name'] ?? ''),
+                            'last_name'          => trim($rowData['last_name'] ?? ''),
+                            'status'             => 'active',
+                            'confirmation_token' => Str::uuid()->toString(),
                         ]
                     );
+
+                    // Backfill token for existing subscribers that were imported without one
+                    if (! $subscriber->confirmation_token) {
+                        $subscriber->update(['confirmation_token' => Str::uuid()->toString()]);
+                    }
 
                     // Only attach sub-groups not already attached
                     $existing = $subscriber->allSubGroups()
