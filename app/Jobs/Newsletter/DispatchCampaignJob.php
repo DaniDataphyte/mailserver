@@ -71,7 +71,7 @@ class DispatchCampaignJob implements ShouldQueue
                 $insertRows[] = [
                     'campaign_id'   => $campaign->id,
                     'subscriber_id' => $subscriber->id,
-                    'status'        => 'pending',
+                    'status'        => 'queued',
                     'created_at'    => $now,
                     'updated_at'    => $now,
                 ];
@@ -88,7 +88,7 @@ class DispatchCampaignJob implements ShouldQueue
 
             // Fan out individual send jobs
             $campaignSends = CampaignSend::where('campaign_id', $campaign->id)
-                ->where('status', 'pending')
+                ->where('status', 'queued')
                 ->get(['id', 'subscriber_id']);
 
             foreach ($campaignSends as $send) {

@@ -53,7 +53,7 @@ class SendNewsletterEmailJob implements ShouldQueue
         }
 
         // Skip if already processed (idempotency)
-        if (! in_array($send->status, ['pending', 'failed'])) {
+        if (! in_array($send->status, ['queued', 'failed'])) {
             return;
         }
 
@@ -64,9 +64,6 @@ class SendNewsletterEmailJob implements ShouldQueue
             $send->update(['status' => 'failed', 'bounce_reason' => 'Missing campaign or subscriber']);
             return;
         }
-
-        // Mark as sending
-        $send->update(['status' => 'sending', 'sent_at' => now()]);
 
         try {
             $mailable = new NewsletterMailable($campaign, $subscriber, (string) $send->id);
@@ -79,6 +76,7 @@ class SendNewsletterEmailJob implements ShouldQueue
 
             $send->update([
                 'status'                          => 'sent',
+                'sent_at'                         => now(),
                 'elastic_email_transaction_id'    => $transactionId,
             ]);
 
