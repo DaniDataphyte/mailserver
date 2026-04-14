@@ -37,7 +37,7 @@ class WebhookController extends Controller
         $payload = $this->parsePayload($request);
 
         if (empty($payload)) {
-            return response('Bad Request', 400);
+            return response('OK', 200);
         }
 
         $eventType     = $this->extractField($payload, ['eventtype', 'EventType', 'event_type', 'status']);

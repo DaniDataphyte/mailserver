@@ -55,12 +55,12 @@ Route::get('/preferences/{token}', [PreferencesController::class, 'show'])
 Route::post('/preferences/{token}', [PreferencesController::class, 'update'])
     ->name('newsletter.preferences.update');
 
-// Elastic Email webhook endpoints — public, no CSRF (raw POST from Elastic Email)
-// GET returns 200 so Elastic Email's URL validator passes.
+// Elastic Email webhook endpoints — public, no CSRF.
+// Some provider configurations send real webhook events as GET query params,
+// while validator checks may hit the URL with an empty GET request.
 // Keep the legacy /api path alive because earlier docs pointed there.
 foreach (['/webhooks/elastic-email', '/api/webhooks/elastic-email'] as $path) {
-    Route::get($path, fn () => response('OK', 200));
-    $route = Route::post($path, [WebhookController::class, 'receive'])
+    $route = Route::match(['get', 'post'], $path, [WebhookController::class, 'receive'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     if ($path === '/webhooks/elastic-email') {
