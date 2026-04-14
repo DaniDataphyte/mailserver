@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Subscriber extends Model
 {
@@ -62,5 +63,22 @@ class Subscriber extends Model
             ')
             ->first()
             ->toArray();
+    }
+
+    public function ensureConfirmationToken(): string
+    {
+        if (filled($this->confirmation_token)) {
+            return $this->confirmation_token;
+        }
+
+        $token = (string) Str::uuid();
+
+        if ($this->exists) {
+            $this->forceFill(['confirmation_token' => $token])->save();
+        } else {
+            $this->confirmation_token = $token;
+        }
+
+        return $token;
     }
 }

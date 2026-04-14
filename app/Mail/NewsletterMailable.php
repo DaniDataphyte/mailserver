@@ -244,7 +244,7 @@ class NewsletterMailable extends Mailable
     private function buildSignedUrl(string $routeName): string
     {
         return \URL::signedRoute($routeName, [
-            'token' => $this->subscriber->confirmation_token,
+            'token' => $this->subscriber->ensureConfirmationToken(),
         ]);
     }
 }
