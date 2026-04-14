@@ -63,7 +63,7 @@ class SyncCampaignStats extends Command
             ->whereIn('status', ['sent', 'pending'])
             ->whereNotNull('elastic_email_transaction_id')
             ->where('sent_at', '>=', now()->subHours($hours))
-            ->with('campaign');
+            ->with(['campaign', 'subscriber']);
 
         if ($campaignId) {
             $query->where('campaign_id', $campaignId);
@@ -81,17 +81,32 @@ class SyncCampaignStats extends Command
 
         foreach ($sends as $send) {
             try {
-                $result = $api->emailsByMsgidInfoGet($send->elastic_email_transaction_id);
+                $result = $api->emailsByTransactionidStatusGet(
+                    $send->elastic_email_transaction_id,
+                    show_failed: true,
+                    show_sent: true,
+                    show_delivered: true,
+                    show_pending: true,
+                    show_opened: true,
+                    show_clicked: true,
+                    show_abuse: true,
+                    show_unsubscribed: true,
+                    show_errors: true,
+                    show_message_ids: true,
+                );
 
-                if (! $result) continue;
-
-                $status    = strtolower($result->getStatus() ?? '');
-                $eventDate = $result->getDateSent()?->format('Y-m-d\TH:i:s') ?? now()->toIso8601String();
-
-                // Only synthesise a webhook if the API reports a terminal state
-                if (! in_array($status, ['delivered', 'opened', 'clicked', 'bounced', 'failed', 'error', 'abusereport'])) {
+                if (! $result) {
                     continue;
                 }
+
+                $status = $this->normaliseStatusFromJob($result);
+
+                if (! $status) {
+                    continue;
+                }
+
+                $eventDate = now()->toIso8601String();
+                $bounceReason = $this->extractFailureReason($result);
 
                 if ($dryRun) {
                     $this->line("  [dry-run] send #{$send->id} tx={$send->elastic_email_transaction_id} → {$status}");
@@ -109,7 +124,7 @@ class SyncCampaignStats extends Command
                         'TransactionID' => $send->elastic_email_transaction_id,
                         'To'            => $send->subscriber?->email,
                         'Date'          => $eventDate,
-                        'BounceError'   => $result->getStatusChangeReason() ?? '',
+                        'BounceError'   => $bounceReason,
                         '_source'       => 'sync-command',
                     ],
                 ]);
@@ -134,5 +149,33 @@ class SyncCampaignStats extends Command
             ->setApiKey('X-ElasticEmail-ApiKey', $apiKey);
 
         return new EmailsApi(new Client(), $config);
+    }
+
+    private function normaliseStatusFromJob(object $result): ?string
+    {
+        return match (true) {
+            (int) ($result->getClickedCount() ?? 0) > 0      => 'clicked',
+            (int) ($result->getOpenedCount() ?? 0) > 0       => 'opened',
+            (int) ($result->getDeliveredCount() ?? 0) > 0    => 'delivered',
+            (int) ($result->getAbuseReportsCount() ?? 0) > 0 => 'abusereport',
+            (int) ($result->getUnsubscribedCount() ?? 0) > 0 => 'unsubscribed',
+            (int) ($result->getFailedCount() ?? 0) > 0       => 'failed',
+            default                                          => null,
+        };
+    }
+
+    private function extractFailureReason(object $result): string
+    {
+        $failed = $result->getFailed() ?? [];
+
+        if (empty($failed)) {
+            return '';
+        }
+
+        $firstFailure = $failed[0];
+
+        return method_exists($firstFailure, 'getError')
+            ? (string) ($firstFailure->getError() ?? '')
+            : '';
     }
 }
