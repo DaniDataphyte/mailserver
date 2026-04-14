@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use App\Models\CampaignSend;
 use App\Models\Subscriber;
 use Illuminate\Bus\Queueable;
+use Illuminate\Mail\SentMessage;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -68,11 +69,11 @@ class SendNewsletterEmailJob implements ShouldQueue
         try {
             $mailable = new NewsletterMailable($campaign, $subscriber, (string) $send->id);
 
-            Mail::to($subscriber->email, $subscriber->full_name)
+            $sentMessage = Mail::to($subscriber->email, $subscriber->full_name)
                 ->send($mailable);
 
             // Extract Elastic Email transaction ID from the sent message headers
-            $transactionId = $this->extractTransactionId($mailable);
+            $transactionId = $this->extractTransactionId($sentMessage);
 
             $send->update([
                 'status'                          => 'sent',
@@ -116,19 +117,14 @@ class SendNewsletterEmailJob implements ShouldQueue
     /* ------------------------------------------------------------------ */
 
     /**
-     * After Mail::send() the Mailable has a ->mailer property with a SentMessage.
-     * The ElasticEmailTransport stores the transaction ID in a header.
+     * Laravel's mailer returns an Illuminate\Mail\SentMessage wrapper when a
+     * message is actually sent. The ElasticEmailTransport stores the transaction
+     * ID on the underlying Symfony message headers.
      */
-    private function extractTransactionId(NewsletterMailable $mailable): ?string
+    private function extractTransactionId(mixed $sentMessage): ?string
     {
         try {
-            // The sent message is accessible via the mailable's internal state
-            // after send(); the transport stores it in 'X-ElasticEmail-TransactionId'
-            $reflection = new \ReflectionProperty($mailable, 'sentMessage');
-            $reflection->setAccessible(true);
-            $sentMessage = $reflection->getValue($mailable);
-
-            if ($sentMessage) {
+            if ($sentMessage instanceof SentMessage) {
                 return $sentMessage->getOriginalMessage()
                     ->getHeaders()
                     ->get('X-ElasticEmail-TransactionId')
