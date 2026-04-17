@@ -3,6 +3,7 @@
 namespace App\Console\Commands\Newsletter;
 
 use App\Jobs\Newsletter\SendNewsletterEmailJob;
+use App\Models\Campaign;
 use App\Models\CampaignSend;
 use Illuminate\Console\Command;
 
@@ -64,5 +65,24 @@ class SendQueuedEmails extends Command
         });
 
         $this->info("Done. Sent: {$sent} | Failed: {$failed}");
+
+        // Mark any campaign whose sends are all fully processed as 'sent'
+        $this->finalizeCampaigns();
+    }
+
+    private function finalizeCampaigns(): void
+    {
+        $sending = Campaign::where('status', 'sending')->get();
+
+        foreach ($sending as $campaign) {
+            $queued = CampaignSend::where('campaign_id', $campaign->id)
+                ->where('status', 'queued')
+                ->exists();
+
+            if (! $queued) {
+                $campaign->update(['status' => 'sent']);
+                $this->line("Campaign #{$campaign->id} marked as sent.");
+            }
+        }
     }
 }

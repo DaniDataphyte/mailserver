@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\Newsletter\DispatchScheduledCampaigns;
+use App\Console\Commands\Newsletter\FinalizeCampaigns;
 use App\Console\Commands\Newsletter\SyncCampaignStats;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -24,6 +25,13 @@ Schedule::command(DispatchScheduledCampaigns::class)
     ->runInBackground()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/campaign-dispatch.log'));
+
+// Finalize campaigns once all sends leave 'queued'
+Schedule::command(FinalizeCampaigns::class)
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/campaign-finalize.log'));
 
 // Reconcile missed webhook events every hour
 Schedule::command(SyncCampaignStats::class, ['--hours=2'])
