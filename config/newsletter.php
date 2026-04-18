@@ -65,4 +65,25 @@ return [
 
     'webhook_secret' => env('ELASTIC_EMAIL_WEBHOOK_SECRET', ''),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Email Send Rate (per minute)
+    |--------------------------------------------------------------------------
+    | Controls how many emails the queue worker sends per minute.
+    | Set this based on your Elastic Email plan's daily sending limit.
+    |
+    | Quick reference (assumes a 16-hour sending window per day):
+    |   100/day    →   1
+    |   1,000/day  →   1
+    |   5,000/day  →   5
+    |   10,000/day →  10
+    |   50,000/day →  52
+    |  100,000/day → 104
+    |
+    | Default: 50 — conservative starting point. Increase once you confirm
+    | your Elastic Email plan limit.
+    */
+
+    'send_rate' => (int) env('ELASTIC_EMAIL_SEND_RATE', 50),
+
 ];

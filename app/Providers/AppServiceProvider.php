@@ -29,7 +29,8 @@ class AppServiceProvider extends ServiceProvider
         // Allow max 15 concurrent email send jobs at a time
         // (Elastic Email recommendation for smooth delivery)
         RateLimiter::for('newsletter-emails', function () {
-            return Limit::perMinute(300); // 300/min = 5/sec sustained
+            $rate = max(1, (int) config('newsletter.send_rate', 50));
+            return Limit::perMinute($rate);
         });
     }
 }

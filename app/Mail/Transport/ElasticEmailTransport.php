@@ -9,6 +9,7 @@ use ElasticEmail\Model\EmailMessageData;
 use ElasticEmail\Model\EmailRecipient;
 use ElasticEmail\Model\BodyPart;
 use ElasticEmail\Model\EncodingType;
+use ElasticEmail\Model\Options;
 use GuzzleHttp\Client;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
@@ -32,11 +33,21 @@ class ElasticEmailTransport extends AbstractTransport
     {
         $email = MessageConverter::toEmail($message->getOriginalMessage());
 
+        // Read the campaign send ID set by NewsletterMailable::headers().
+        // Passed as a recipient custom field so Elastic Email echoes it back
+        // in every webhook notification payload — allows direct CampaignSend
+        // lookup without relying on Elastic Email's own TransactionID.
+        $campaignSendId = $email->getHeaders()->get('X-Campaign-Send-Id')
+            ?->getBodyAsString();
+
         // Build recipients
         $recipients = [];
         foreach ($email->getTo() as $address) {
             $recipient = new EmailRecipient();
             $recipient->setEmail($address->getAddress());
+            if ($campaignSendId) {
+                $recipient->setFields(['send_id' => $campaignSendId]);
+            }
             $recipients[] = $recipient;
         }
 
@@ -93,10 +104,16 @@ class ElasticEmailTransport extends AbstractTransport
             $content->setHeaders($headers);
         }
 
+        // Explicitly enable open + click tracking regardless of account defaults
+        $options = new Options();
+        $options->setTrackOpens(true);
+        $options->setTrackClicks(true);
+
         // Build and send
         $messageData = new EmailMessageData();
         $messageData->setRecipients($recipients);
         $messageData->setContent($content);
+        $messageData->setOptions($options);
 
         $result = $this->api->emailsPost($messageData);
 

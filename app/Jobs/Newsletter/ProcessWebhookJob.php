@@ -243,7 +243,17 @@ class ProcessWebhookJob implements ShouldQueue
 
     private function resolveSend(WebhookLog $log): ?CampaignSend
     {
-        // Primary: transaction ID
+        // Priority 1: send_id custom field set by ElasticEmailTransport on every
+        // outgoing email — Elastic Email echoes recipient fields in webhook payloads.
+        // This is the most reliable match (no ambiguity, works even when Elastic
+        // Email omits their own TransactionID from the payload).
+        $sendId = $this->extractField($log->payload, ['send_id']);
+        if ($sendId) {
+            $send = CampaignSend::with('subscriber')->find((int) $sendId);
+            if ($send) return $send;
+        }
+
+        // Priority 2: Elastic Email's own TransactionID stored at send time.
         if ($log->transaction_id) {
             $send = CampaignSend::where('elastic_email_transaction_id', $log->transaction_id)
                 ->with('subscriber')
@@ -252,7 +262,7 @@ class ProcessWebhookJob implements ShouldQueue
             if ($send) return $send;
         }
 
-        // Fallback: most recent send to this email in a sending/sent campaign
+        // Fallback: most recent send to this email in a sending/sent campaign.
         if ($log->to_email) {
             return CampaignSend::whereHas('subscriber', fn ($q) => $q->where('email', $log->to_email))
                 ->whereHas('campaign', fn ($q) => $q->whereIn('status', ['sending', 'sent']))

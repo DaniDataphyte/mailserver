@@ -34,14 +34,25 @@ class WebhookController extends Controller
             return response('Unauthorized', 401);
         }
 
+        // Diagnostic: log every inbound request (raw) so we can confirm format and field names.
+        // This fires even for empty/GET pings so we can tell them apart from real events.
+        Log::info('WebhookController: inbound', [
+            'method'       => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'ip'           => $request->ip(),
+            'query'        => $request->query(),
+            'raw_body'     => substr($request->getContent(), 0, 500),
+        ]);
+
         $payload = $this->parsePayload($request);
 
         if (empty($payload)) {
             return response('OK', 200);
         }
 
-        $eventType     = $this->extractField($payload, ['eventtype', 'EventType', 'event_type', 'status']);
-        $transactionId = $this->extractField($payload, ['transactionid', 'TransactionID', 'transaction_id', 'msgid', 'MsgID']);
+        $eventType     = $this->extractField($payload, ['eventtype', 'EventType', 'event_type', 'status', 'Status']);
+        // Elastic Email HTTP Notifications use 'transaction' (not 'transactionid')
+        $transactionId = $this->extractField($payload, ['transaction', 'transactionid', 'TransactionID', 'transaction_id', 'msgid', 'MsgID']);
         $toEmail       = $this->extractField($payload, ['to', 'To', 'recipient', 'Recipient']);
 
         $log = WebhookLog::create([

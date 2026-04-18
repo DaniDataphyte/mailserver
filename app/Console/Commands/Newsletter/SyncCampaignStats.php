@@ -35,7 +35,7 @@ class SyncCampaignStats extends Command
 {
     protected $signature = 'campaigns:sync-stats
                               {--campaign= : Sync a specific campaign ID only}
-                              {--hours=2   : Look back N hours for unconfirmed sends}
+                              {--hours=48  : Look back N hours for unconfirmed sends}
                               {--dry-run   : Report what would be synced without writing}';
 
     protected $description = 'Reconcile campaign delivery stats from Elastic Email API (fallback for missed webhooks)';
@@ -59,8 +59,10 @@ class SyncCampaignStats extends Command
 
         $api = $this->buildApi($apiKey);
 
+        // Include 'delivered' and 'opened' so they can be upgraded to
+        // 'opened' or 'clicked' respectively when the API returns new data.
         $query = CampaignSend::query()
-            ->whereIn('status', ['sent', 'pending'])
+            ->whereIn('status', ['sent', 'pending', 'delivered', 'opened'])
             ->whereNotNull('elastic_email_transaction_id')
             ->where('sent_at', '>=', now()->subHours($hours))
             ->with(['campaign', 'subscriber']);
@@ -102,6 +104,15 @@ class SyncCampaignStats extends Command
                 $status = $this->normaliseStatusFromJob($result);
 
                 if (! $status) {
+                    continue;
+                }
+
+                // Never downgrade: skip if API returns a lower-priority status
+                // than what is already recorded (e.g. don't overwrite 'clicked' with 'delivered')
+                $priority = ['failed' => 0, 'delivered' => 1, 'opened' => 2, 'clicked' => 3];
+                $current  = $priority[$send->status] ?? -1;
+                $incoming = $priority[$status]        ?? -1;
+                if ($incoming <= $current) {
                     continue;
                 }
 
