@@ -15,27 +15,31 @@ use Illuminate\Support\Facades\Log;
 /**
  * Fallback stats reconciliation command.
  *
- * Runs hourly to catch any events that were missed by webhooks
- * (network errors, Elastic Email retries that never arrived, etc.)
+ * Designed to run as two scheduled jobs:
  *
- * Strategy:
- *  1. Find campaigns in 'sending' or 'sent' status with recent activity.
- *  2. For each campaign, find CampaignSends still in 'sent' status
- *     (i.e. sent but no delivery confirmation received yet).
- *  3. Query Elastic Email API v4 for message details by transaction ID.
- *  4. If status has changed, create a synthetic WebhookLog and dispatch
- *     ProcessWebhookJob to apply the same logic consistently.
+ *  JOB 1 — Recent (hourly, low cost):
+ *    Checks sends from the last SYNC_RECENT_HOURS hours.
+ *    Catches deliveries, opens, and clicks shortly after sending.
+ *    Limit: SYNC_RECENT_LIMIT sends per run.
+ *
+ *  JOB 2 — Deep scan (daily at 2 AM, off-peak):
+ *    Checks all unresolved sends from the last SYNC_DEEP_DAYS days.
+ *    Catches late opens/clicks from subscribers who engage days later.
+ *    Limit: SYNC_DEEP_LIMIT sends per run.
  *
  * Usage:
- *   php artisan campaigns:sync-stats
- *   php artisan campaigns:sync-stats --campaign=123
- *   php artisan campaigns:sync-stats --hours=6
+ *   php artisan campaigns:sync-stats                        ← all unresolved, no limit
+ *   php artisan campaigns:sync-stats --hours=8 --limit=500  ← recent job
+ *   php artisan campaigns:sync-stats --days=30 --limit=2000 ← deep scan job
+ *   php artisan campaigns:sync-stats --campaign=123 --dry-run
  */
 class SyncCampaignStats extends Command
 {
     protected $signature = 'campaigns:sync-stats
                               {--campaign= : Sync a specific campaign ID only}
-                              {--hours=48  : Look back N hours for unconfirmed sends}
+                              {--hours=    : Look back N hours (overrides --days)}
+                              {--days=     : Look back N days (default: 30)}
+                              {--limit=    : Max sends to process per run (0 = unlimited)}
                               {--dry-run   : Report what would be synced without writing}';
 
     protected $description = 'Reconcile campaign delivery stats from Elastic Email API (fallback for missed webhooks)';
@@ -51,21 +55,34 @@ class SyncCampaignStats extends Command
             return;
         }
 
-        $hours      = (int) $this->option('hours');
+        $hours      = $this->option('hours') ? (int) $this->option('hours') : null;
+        $days       = $this->option('days')  ? (int) $this->option('days')  : 30;
+        $limit      = $this->option('limit') !== null ? (int) $this->option('limit') : 0;
         $campaignId = $this->option('campaign');
         $dryRun     = $this->option('dry-run');
 
-        $this->info("Syncing campaign stats (lookback: {$hours}h)" . ($dryRun ? ' [dry-run]' : '') . '...');
+        $window = $hours ? "{$hours}h" : "{$days}d";
+        $cap    = $limit > 0 ? " (cap: {$limit})" : '';
+        $this->info("Syncing campaign stats (window: {$window}{$cap})" . ($dryRun ? ' [dry-run]' : '') . '...');
 
         $api = $this->buildApi($apiKey);
 
-        // Include 'delivered' and 'opened' so they can be upgraded to
-        // 'opened' or 'clicked' respectively when the API returns new data.
+        // Only check sends that have not yet reached a terminal/fully-resolved status.
+        // 'clicked'   = highest trackable status — nothing further to do.
+        // 'bounced' / 'failed' / 'complained' = terminal — skip permanently.
+        // Oldest-first ensures the deep scan clears the longest-waiting sends first.
+        $cutoff = $hours ? now()->subHours($hours) : now()->subDays($days);
+
         $query = CampaignSend::query()
             ->whereIn('status', ['sent', 'pending', 'delivered', 'opened'])
             ->whereNotNull('elastic_email_transaction_id')
-            ->where('sent_at', '>=', now()->subHours($hours))
+            ->where('sent_at', '>=', $cutoff)
+            ->orderBy('sent_at', 'asc')
             ->with(['campaign', 'subscriber']);
+
+        if ($limit > 0) {
+            $query->limit($limit);
+        }
 
         if ($campaignId) {
             $query->where('campaign_id', $campaignId);
@@ -74,7 +91,7 @@ class SyncCampaignStats extends Command
         $sends = $query->get();
 
         if ($sends->isEmpty()) {
-            $this->line("No unconfirmed sends in the last {$hours}h.");
+            $this->line('No unresolved sends found.');
             return;
         }
 
@@ -149,7 +166,7 @@ class SyncCampaignStats extends Command
             }
         }
 
-        $this->info("Queued {$synced} sync webhook jobs.");
+        $this->info("Queued {$synced} / {$sends->count()} sync webhook jobs.");
     }
 
     /* ------------------------------------------------------------------ */

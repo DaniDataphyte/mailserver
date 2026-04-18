@@ -86,4 +86,34 @@ return [
 
     'send_rate' => (int) env('ELASTIC_EMAIL_SEND_RATE', 50),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics Sync — Job 1: Recent (runs hourly)
+    |--------------------------------------------------------------------------
+    | Scans sends from the last N hours. Catches deliveries, opens, and clicks
+    | shortly after a campaign is sent. Keep the limit modest — this runs every
+    | hour so unchecked sends roll into the next run automatically.
+    |
+    |  SYNC_RECENT_HOURS  — how far back to look (default: 8 hours)
+    |  SYNC_RECENT_LIMIT  — max sends to check per run (default: 500)
+    */
+
+    'sync_recent_hours' => (int) env('SYNC_RECENT_HOURS', 8),
+    'sync_recent_limit' => (int) env('SYNC_RECENT_LIMIT', 500),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics Sync — Job 2: Deep Scan (runs daily at 2 AM)
+    |--------------------------------------------------------------------------
+    | Scans all unresolved sends from the last N days. Catches late opens and
+    | clicks from subscribers who engage days after the campaign was sent.
+    | Runs off-peak so a higher limit is safe.
+    |
+    |  SYNC_DEEP_DAYS   — how far back to look (default: 30 days)
+    |  SYNC_DEEP_LIMIT  — max sends to check per run (default: 2000)
+    */
+
+    'sync_deep_days'  => (int) env('SYNC_DEEP_DAYS',  30),
+    'sync_deep_limit' => (int) env('SYNC_DEEP_LIMIT', 2000),
+
 ];
